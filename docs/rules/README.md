@@ -22,6 +22,7 @@
 | [agent-safety-decision.md](agent-safety-decision.md) | 에이전트가 관측 대상 앱을 죽이지 않게 하는 규칙들 | 2026-09-10 |
 | [build-order-decision.md](build-order-decision.md) | 🔴 바이트코드를 v0이 아니라 v1에 두기로 한 것 | 2026-09-10 |
 | [stack-decision.md](stack-decision.md) | 자바 21/17 이중 툴체인, Gradle. **25에서 21로 내린 이유** | 2026-09-10 |
+| [module-boundary-decision.md](module-boundary-decision.md) | 🔴 모듈은 「누구의 클래스패스」로만 나눈다. **13개에서 6개로 접은 이유** | 2026-09-10 |
 
 ## 아직 안 적은 것
 

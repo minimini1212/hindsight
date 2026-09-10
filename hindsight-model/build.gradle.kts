@@ -12,4 +12,16 @@
 // 문서에만 적어두면 언젠가 누가 한 줄 추가한다.
 // 2026-09-10 실제로 막는지 확인함: jackson-annotations 를 넣으니 빌드가 실패했다.
 
-// 의존성 없음. 이 빈 자리가 이 모듈의 요점이다.
+plugins {
+    // 기록 표본(io.hindsight.testkit.Recordings)을 여기 둔다.
+    //
+    // 🔴 표본을 위한 «모듈»을 따로 만들지 않는다. 한때 hindsight-testkit 이 있었는데,
+    // 하는 일이 「자료 구조로 표본을 만든다」뿐이라 자료 구조 옆이 제자리였다.
+    //
+    // testFixtures 는 별도 소스 세트라 «본체 jar 에 안 들어간다». 그래서 관측 대상
+    // 앱으로 딸려 가지 않는다 — 위의 의존성 0 규칙이 그대로 유지된다.
+    // 쓰는 쪽: testImplementation(testFixtures(project(":hindsight-model")))
+    `java-test-fixtures`
+}
+
+// 본체 의존성 없음. 이 빈 자리가 이 모듈의 요점이다.

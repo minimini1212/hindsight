@@ -12,7 +12,8 @@
 | | |
 | --- | --- |
 | 문서 | PRD · DESIGN · DATA_CONTRACT · 규율 · 결정 기록 셋 · 리뷰 기록 하나 |
-| 코드 | `hindsight-model`(자료 구조) · `hindsight-core`(읽기·쓰기) · `hindsight-testkit`(표본) |
+| 코드 | `hindsight-model`(자료 구조 + 표본) · `hindsight-core`(읽기·쓰기) |
+| 모듈 | 🔄 **13개 → 6개로 접었다** (2026-09-10). 「누구의 클래스패스」로만 나눈다 |
 | 빌드 | ✅ Gradle 9.3 · **이중 툴체인 실측 확인** — model major=61(Java 17), core major=65(Java 21) |
 | 테스트 | ✅ **9개 통과** (왕복 · 「모름」 보존 · 판 번호 거부 · 자동 PR 조건) |
 | 의존성 금지선 | ✅ **실제로 막는 것 확인** — jackson을 model에 넣으니 빌드 실패 |
@@ -40,7 +41,8 @@
 - ✅ Gradle 빌드가 실제로 도는지 확인. 버전 실재 확인 (foojay는 0.9.0→1.0.0으로 고쳐야 했다)
 - ✅ `hindsight-model` — 기록 자료 구조. Jackson 애너테이션 없이
 - ✅ `hindsight-core` — 기록 읽기·쓰기 + **왕복 테스트**
-- ✅ `hindsight-testkit` — 기록 표본 (전부 채운 것 / 「모름」이 많은 것)
+- ✅ 기록 표본 (전부 채운 것 / 「모름」이 많은 것) — `hindsight-model` 의 테스트 픽스처로
+- ✅ 🔄 모듈을 13개에서 6개로 접었다 ([module-boundary-decision.md](docs/rules/module-boundary-decision.md))
 - ⬜ 위 「먼저 확인해야 할 것」 둘
 - ⬜ `demo-app` 뼈대 — 🔴 **진짜 서비스로.** JPA 연관관계·트랜잭션·페이징
 
@@ -118,3 +120,7 @@
 - ⬜ 에이전트 예외가 밖으로 안 나가는지
 - ⬜ 담긴 시간과 담으려던 시간이 실제로 둘 다 기록되는지
 - ⬜ 기록 파일에 개인정보가 없는지 검사하는 테스트
+- ⬜ 🔄 **패키지 의존 방향 검사** — 「`replay` 가 `brain` 을 몰라야 한다」,
+  「`brain` 이 `java.nio` 를 직접 부르면 안 된다」. 모듈로 나눠서 막으려 했던 것을
+  검사로 옮긴 자리다 ([module-boundary-decision.md](docs/rules/module-boundary-decision.md) §4).
+  🔴 지금은 **사람이 지킨다** — 즉 안 지켜질 수 있다

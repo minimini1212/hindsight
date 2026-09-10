@@ -5,25 +5,39 @@ plugins {
 
 rootProject.name = "hindsight"
 
-// ⚠️ 여기에는 «지금 파일이 들어 있는» 모듈만 적는다.
+// ════════════════════════════════════════════════════════════════════════════
+// 🔴 모듈을 나누는 기준은 하나뿐이다: 「누구의 클래스패스에 올라가나」
 //
-// 빈 모듈을 미리 include 해 두지 않는다. 빈 폴더는 「누가 시작해 놨나」로 읽혀서,
-// 다음 사람이 매번 열어 보고 비었다는 것을 확인해야 한다. 없으면 그 질문이 안 생긴다.
-// 무엇을 언제 만들 것인가의 지도는 docs/00_CODE_WALKTHROUGH.md §2 에 있다.
+// 관측 대상 앱 «안»으로 들어가는 코드는 의존성을 함부로 못 늘린다. 우리가 끌고 들어간
+// 라이브러리가 그 앱의 것과 부딪히면 우리 도구가 아니라 그 앱이 죽는다.
+// 그래서 «안으로 들어가는 것»과 «밖에 있는 것»은 반드시 모듈이 갈려야 한다.
+//
+// 그 밖의 구분 — 읽기·재생·진단·명령줄 — 은 전부 «패키지»다. 모듈로 나눠도
+// 얻는 게 없고, 빌드 파일과 이름만 늘어난다.
+//
+// ⚠️ 한때 이걸 13개로 나눴다가 6개로 접었다 (2026-09-10). 특히 `hindsight-guard` 를
+//    「파일을 쓰는 유일한 통로」라며 모듈로 뺐는데, 모듈 경계는 파일 쓰기를 못 막는다 —
+//    같은 프로젝트 안에서 java.nio 를 직접 부르면 그만이다. 막는 척한 것이었다.
+// 🧭 근거: docs/rules/module-boundary-decision.md
+// ════════════════════════════════════════════════════════════════════════════
 
-include("hindsight-model")     // 기록 자료 구조 (Java 17 · 의존성 없음)
-include("hindsight-core")      // 기록 읽기·쓰기·가명화
-include("hindsight-testkit")   // 기록 표본과 테스트 도우미
+// ── 관측 대상 앱 «안»에서 도는 것 ──────────────────────────────────────────
+include("hindsight-model")     // 안팎이 공유하는 자료 구조. Java 17 · 의존성 0
 
-// 아직 없는 모듈 — 첫 파일을 쓸 때 폴더와 함께 여기 추가한다.
+// ── 관측 대상 앱 «밖»에서 도는 것 ──────────────────────────────────────────
+include("hindsight-core")      // 읽기 · 재생 · 오라클 · 진단 · 채점 · 명령줄
+                               // 안이 패키지로 나뉜다 (docs/00_CODE_WALKTHROUGH.md §3)
+
+// ── 아직 없는 모듈 — 첫 파일을 쓸 때 폴더와 함께 여기 추가한다 ────────────
 //
 //   v0  demo-app                   관측 대상. 🔴 진짜 스프링 서비스로 만든다
-//   v0  hindsight-recorder-simple  Filter + DataSource 감싸기 (바이트코드 없음)
-//   v0  hindsight-replay           재생 · 오라클 · 테스트 생성
-//   v0  hindsight-guard            🔴 패치 경로 검사. 파일을 쓰는 유일한 통로
-//   v0  hindsight-brain            진단 · 채점 고리 · PR
-//   v0  hindsight-cli              hs 명령어
-//   v1  hindsight-agent-boot       🔴 부트스트랩 껍데기 (Java 17 · 의존성 없음)
-//   v1  hindsight-agent            premain · ByteBuddy(셰이딩) · 링 버퍼
-//   v3  hindsight-mcp              코딩 에이전트용 통로
-//   v3  hindsight-server           저장소 · REST · 화면
+//   v0  hindsight-recorder-simple  Filter + DataSource 감싸기
+//                                  🔴 demo-app «안»으로 들어간다. 그래서 따로다 —
+//                                     core 에 넣으면 Spring AI 와 picocli 가
+//                                     관측 대상 앱으로 딸려 들어간다
+//   v1  hindsight-agent-boot       부트스트랩 클래스로더에 올라간다. Java 17 · 의존성 0
+//                                  🔴 «다른 클래스로더»라 같은 jar 에 못 넣는다
+//   v1  hindsight-agent            premain · ByteBuddy(셰이딩) · 링 버퍼. Java 17
+//
+//   v3  화면이 필요해지면 그때 hindsight-server 를 가른다 — Spring Boot 플러그인은
+//       모듈 단위라서 그때는 진짜로 갈라야 한다. 지금 미리 만들지 않는다.

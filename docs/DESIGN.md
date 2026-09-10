@@ -109,21 +109,42 @@ v0 의 기록 방법 (바이트코드 없음)
 
 ## §3 모듈
 
+> 🔴 **모듈은 「누구의 클래스패스에 올라가나」로만 나눈다.**
+> 읽기·재생·진단·명령줄 같은 구분은 전부 **패키지**다.
+>
+> 🔄 **2026-09-10: 13개에서 6개로 접었다.** 「개념이 다르니 모듈도 다르게」로 나눴더니
+> 클래스 한두 개짜리 모듈이 다섯 개 생겼다. 특히 `hindsight-guard` 를 「파일을 쓰는 유일한
+> 통로」라며 모듈로 뺐는데, **모듈 경계는 파일 쓰기를 못 막는다** — 막는 척한 것이었다.
+> 🧭 [`rules/module-boundary-decision.md`](rules/module-boundary-decision.md)
+
+### 관측 대상 앱 «안»에서 도는 것 — 의존성을 함부로 못 늘린다
+
 | 모듈 | 자바 | 의존성 | 하는 일 | 단계 |
 | --- | --- | --- | --- | --- |
-| `hindsight-model` | 17 | **없음** | 기록 파일의 자료 구조(record)만 | v0 |
-| `hindsight-core` | 25 | model, Jackson | 기록 읽기·쓰기·질의·가명화 | v0 |
-| `hindsight-recorder-simple` | 25 | core, servlet-api | **v0의 기록기.** Filter + DataSource 감싸기 | v0 |
-| `hindsight-replay` | 25 | core, JUnit 5 | 재생 · 오라클 · 테스트 생성 | v0 |
-| `hindsight-guard` | 25 | *(없음)* | 🔴 패치 경로 검사. **파일을 쓰는 유일한 통로** | v0 |
-| `hindsight-brain` | 25 | core, replay, guard, Spring AI | 진단 · 채점 고리 · PR | v0 |
-| `hindsight-cli` | 25 | 위 전부, picocli | `hs` 명령어 | v0 |
+| `hindsight-model` | **17** | **없음** | 기록 파일의 자료 구조(record)만. 🔴 안팎이 공유한다 | v0 |
+| `hindsight-recorder-simple` | 21 | model, servlet-api | **v0의 기록기.** Filter + DataSource 감싸기 | v0 |
 | `hindsight-agent-boot` | **17** | **없음** | 🔴 부트스트랩에 올라가는 얇은 껍데기 (§3-2) | v1 |
 | `hindsight-agent` | **17** | model + ByteBuddy(셰이딩) | 계측·링 버퍼·방아쇠·덤프 | v1 |
-| `hindsight-mcp` | 25 | core, replay | 코딩 에이전트용 통로 | v3 |
-| `hindsight-server` | 25 | core, **replay**, Spring Boot | 저장소 · REST · 화면 | v3 |
-| `hindsight-testkit` | 25 | model | 기록 픽스처와 테스트 도우미 | v0 |
-| `demo-app` | 25 | Spring Boot | 🔴 **진짜 서비스다. 소품이 아니다** (§3-4) | v0 |
+
+🔴 **`recorder-simple` 이 여기 있는 이유**: demo-app «안»에 들어간다. `core` 에 합치면
+**Spring AI 와 picocli 가 관측 대상 앱으로 딸려 들어간다** — 우리가 막으려던 바로 그 일이다.
+
+### 관측 대상 앱 «밖»에서 도는 것
+
+| 모듈 | 자바 | 의존성 | 하는 일 | 단계 |
+| --- | --- | --- | --- | --- |
+| `hindsight-core` | 21 | model, Jackson, JUnit 5, Spring AI, picocli | **읽기·재생·오라클·진단·채점·명령어 전부** | v0 |
+| `demo-app` | 21 | Spring Boot | 🔴 **진짜 서비스다. 소품이 아니다** (§3-4) | v0 |
+
+`hindsight-core` 안의 패키지: `store`(읽기·쓰기) · `privacy`(가명화) · `replay`(재생·오라클) ·
+`guard`(패치 경로 검사) · `brain`(진단·채점) · `cli`(명령어) · `mcp`(v3).
+기록 표본은 `hindsight-model` 의 테스트 픽스처에 있다 — 🔴 별도 소스 세트라 본체 jar 에 안 들어간다.
+
+⬜ **v3 에 화면이 필요해지면 `hindsight-server` 를 가른다.** Spring Boot 플러그인이 모듈
+단위라서 그때는 선택의 여지가 없다. **미리 만들지 않는다.**
+
+⬜ **패키지 의존 방향은 아직 검사가 없다.** 「`replay` 가 `brain` 을 몰라야 한다」는
+지금 사람이 지킨다. 모듈 다섯 개보다 검사 한 개가 싸다 (TODOS).
 
 ### §3-1 🔴 에이전트에 Spring을 쓰면 안 되는 이유
 
@@ -351,8 +372,13 @@ LLM에게 *"테스트를 통과시켜라"* 라고 하면 **테스트를 지워�
 - ⚠️ `src/main/resources/**` 는 **자동 통과 대상이 아니다.** `application.yml` 하나로 검증을 끄거나
   기능 플래그를 뒤집을 수 있다. 여기를 건드린 패치는 **중간 확신도**로 내려 사람에게 보낸다
 - 검사는 `git apply` **전에** 한다. 경로를 실제 경로로 펴서(`..`·심볼릭 링크 거부) 확인한다
-- 🔴 **이 검사는 `hindsight-guard` 라는 자기 모듈에 있고, 그 모듈이 파일을 쓰는 유일한 통로다.**
-  다른 모듈 안에 숨겨 두면 우회하는 데 호출 한 줄이면 된다
+- 이 검사는 `io.hindsight.core.guard` 패키지에 모아 두고, **패치를 파일로 쓰는 코드는 여기뿐이다**
+  - 🔄 **한때 이걸 «모듈»로 뺐다가 접었다** (2026-09-10). 「자기 모듈이면 우회하기 어렵다」는
+    이유였는데 **틀렸다** — 모듈 경계는 파일 쓰기를 못 막는다. 같은 프로젝트의 다른 코드가
+    `java.nio.file.Files` 를 직접 부르면 그만이고 Gradle 은 그걸 모른다.
+    🔴 **그건 장치가 아니라 그림이었다.**
+  - ⬜ **진짜로 막으려면 검사가 필요하다** — 「`brain` 이 `java.nio` 를 직접 부르면 실패」.
+    아직 없다 (TODOS). 지금 실제로 막는 것은 아래 두 줄(적용 전 경로 확인 · 테스트 재생성)이다
 - 재생 테스트는 매번 **기록에서 새로 만들어** 돌린다. 디스크에 있는 것을 믿지 않는다
 
 ### §7-2 🔴 과적합을 막는 네 겹
@@ -506,7 +532,8 @@ java -javaagent:hindsight-agent.jar \
 ## §13 단계 — 각 단계가 그 자체로 완결된다
 
 ### v0 — 고리 전체, 바이트코드 없음 (3~4주)
-`hindsight-model`·`core`·**`recorder-simple`**·`replay`·`guard`·`brain`·`cli`·`testkit`·**진짜 `demo-app`**
+모듈 넷: `hindsight-model` · `hindsight-core` · **`hindsight-recorder-simple`** · **진짜 `demo-app`**
+(`core` 안에 `store`·`privacy`·`replay`·`guard`·`brain`·`cli` 패키지가 생긴다)
 
 - 기록은 `Filter` + `DataSource` 감싸기로. ByteBuddy·셰이딩·클래스로더 **없음**
 - 오라클(§6-1) 셋, `DIVERGED`(§6-2), 과적합 네 겹(§7-2), 화이트리스트(§7-1)
@@ -528,7 +555,9 @@ java -javaagent:hindsight-agent.jar \
 JFR 연동, 요약 층, 자원·메모리 방아쇠, 오픈소스 실제 버그 3건 시험(§11-1)
 
 ### v3 — 열어주기 (2주)
-`hindsight-mcp`(코딩 에이전트용), `hindsight-server`(화면). 🔴 서버는 `replay` 에도 의존한다 —
+`core.mcp` 패키지(코딩 에이전트용)와 — **여기서 처음으로 모듈이 하나 늘어난다** —
+`hindsight-server`(화면). Spring Boot 플러그인이 모듈 단위라서 그때는 갈라야 한다.
+🔴 서버는 재생도 해야 한다 —
 v3의 목표가 *"재생해봐"* 이므로
 
 ### 🔴 일정에 대한 정직한 말
