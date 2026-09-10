@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ
+.idea/
+*.iml
+out/
+
+# 🔴 비밀값. 절대 커밋하지 않는다
+.env
+.env.local
+
+# 🔴 기록 파일에는 (가명화를 거쳤더라도) 실제 트래픽의 형태가 남는다.
+#    저장소에 올리지 않는다. 테스트용 픽스처는 hindsight-testkit/src/main/resources/fixtures 에
+#    손으로 만든 것만 둔다.
+recordings/
+*.jfr
+
+# 로그
+*.log
+logs/
