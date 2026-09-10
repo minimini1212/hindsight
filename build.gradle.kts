@@ -44,9 +44,18 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+
+        // 🔴 이게 없으면 한글이 깨진다. 윈도우에서 Gradle 이 테스트 JVM 을
+        // x-windows-949(옛 한글 인코딩)로 띄우기 때문이다. 이 프로젝트는 테스트 이름도
+        // 출력도 전부 한글이라, 없으면 실패 원인을 읽을 수가 없다.
+        // 2026-09-11 실제로 겪었다 — 실측 결과가 「?? ?? ??」로 나왔다.
+        systemProperty("file.encoding", "UTF-8")
+        jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
+
         testLogging {
             events("failed", "skipped")
             showStackTraces = true
+            showStandardStreams = false // 필요할 때만 -i 로 본다
         }
     }
 
