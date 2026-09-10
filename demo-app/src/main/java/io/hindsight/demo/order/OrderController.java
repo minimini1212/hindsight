@@ -1,6 +1,8 @@
 package io.hindsight.demo.order;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,5 +22,11 @@ public class OrderController {
     @GetMapping
     public List<OrderView> list() {
         return orderService.findAll();
+    }
+
+    /** 🔬 본문이 있는 요청. Filter 가 본문을 잡고도 앱이 정상인지 재는 데 쓴다. */
+    @PostMapping
+    public OrderView create(@RequestBody CreateOrderRequest request) {
+        return orderService.create(request);
     }
 }

@@ -1,5 +1,7 @@
 package io.hindsight.demo.order;
 
+import io.hindsight.demo.member.Member;
+import io.hindsight.demo.member.MemberRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,9 +22,25 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final MemberRepository memberRepository;
 
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(OrderRepository orderRepository, MemberRepository memberRepository) {
         this.orderRepository = orderRepository;
+        this.memberRepository = memberRepository;
+    }
+
+    /**
+     * 주문을 만든다.
+     *
+     * <p>🔬 이 메서드는 「본문이 있는 요청」을 재려고 만들었다. 그리고 재생 실험에서
+     * <b>상태를 바꾸는 요청은 재생해도 같은 답이 안 나온다</b>는 것을 보여주는 자리이기도 하다.
+     */
+    @Transactional
+    public OrderView create(CreateOrderRequest request) {
+        Member member = memberRepository.findById(request.memberId())
+                .orElseThrow(() -> new IllegalArgumentException("없는 회원: " + request.memberId()));
+        Order saved = orderRepository.save(new Order(member, request.product()));
+        return new OrderView(saved.getId(), saved.getProduct(), member.getName());
     }
 
     /**
