@@ -119,15 +119,20 @@ v0 의 기록 방법 (바이트코드 없음)
 
 ### 관측 대상 앱 «안»에서 도는 것 — 의존성을 함부로 못 늘린다
 
-| 모듈 | 자바 | 의존성 | 하는 일 | 단계 |
+| 모듈 | 자바 | 의존성 | 하는 일 | 강제인가 |
 | --- | --- | --- | --- | --- |
-| `hindsight-model` | **17** | **없음** | 기록 파일의 자료 구조(record)만. 🔴 안팎이 공유한다 | v0 |
-| `hindsight-recorder-simple` | 21 | model, servlet-api | **v0의 기록기.** Filter + DataSource 감싸기 | v0 |
-| `hindsight-agent-boot` | **17** | **없음** | 🔴 부트스트랩에 올라가는 얇은 껍데기 (§3-2) | v1 |
-| `hindsight-agent` | **17** | model + ByteBuddy(셰이딩) | 계측·링 버퍼·방아쇠·덤프 | v1 |
+| `hindsight-model` | **17** | **없음** | 기록 파일의 자료 구조(record)만. 🔴 안팎이 공유한다 | 🟡 v1 부터 물리. v0 에는 **규율** |
+| *v0 기록기* | 21 | model, core | `Filter` + `DataSource` 감싸기 | ⬜ **모듈일지 demo-app 안의 패키지일지 미정** |
+| `hindsight-agent-boot` | **17** | **없음** | 🔴 부트스트랩에 올라가는 얇은 껍데기 (§3-2) | ✅ **물리** — 다른 클래스로더 |
+| `hindsight-agent` | **17** | model + ByteBuddy(셰이딩) | 계측·링 버퍼·방아쇠·덤프 | ✅ **물리** — 별도 jar·셰이딩 |
 
-🔴 **`recorder-simple` 이 여기 있는 이유**: demo-app «안»에 들어간다. `core` 에 합치면
-**Spring AI 와 picocli 가 관측 대상 앱으로 딸려 들어간다** — 우리가 막으려던 바로 그 일이다.
+🔴 **진짜로 강제되는 것은 아래 둘뿐이고, 둘 다 v1 이다.**
+
+- `hindsight-model` 은 v0 만 보면 `core` 에 합쳐도 아무 일도 안 난다. 그래도 따로 두는 이유:
+  「의존성 0」은 **나중에 붙이기 어려운 제약**이라서다. 합쳐 뒀으면 `@JsonIgnore` 를 붙이며
+  살다가 v1 에 레코드 여덟 개에서 걷어내야 했을 것이다 — 실제로 그럴 뻔했다
+  ([`rules/module-boundary-decision.md`](rules/module-boundary-decision.md) §6-1)
+- ⬜ **v0 기록기는 지금 정하지 않는다.** 아직 코드가 없다. 만들 때 정한다 (같은 문서 §6-2)
 
 ### 관측 대상 앱 «밖»에서 도는 것
 
@@ -532,8 +537,9 @@ java -javaagent:hindsight-agent.jar \
 ## §13 단계 — 각 단계가 그 자체로 완결된다
 
 ### v0 — 고리 전체, 바이트코드 없음 (3~4주)
-모듈 넷: `hindsight-model` · `hindsight-core` · **`hindsight-recorder-simple`** · **진짜 `demo-app`**
+모듈 셋: `hindsight-model` · `hindsight-core` · **진짜 `demo-app`**
 (`core` 안에 `store`·`privacy`·`replay`·`guard`·`brain`·`cli` 패키지가 생긴다)
+⬜ **v0 기록기**는 따로 모듈일지 demo-app 안의 패키지일지 만들 때 정한다 (§3)
 
 - 기록은 `Filter` + `DataSource` 감싸기로. ByteBuddy·셰이딩·클래스로더 **없음**
 - 오라클(§6-1) 셋, `DIVERGED`(§6-2), 과적합 네 겹(§7-2), 화이트리스트(§7-1)

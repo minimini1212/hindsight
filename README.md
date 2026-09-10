@@ -77,17 +77,22 @@ Keploy · ReCrash(2008) · 테스트 카빙 · JFR · APM · Sentry Autofix. **�
 
 ```
 관측 대상 앱 «안»에서 도는 것  — 의존성을 함부로 못 늘린다
-  ✅ hindsight-model            안팎이 공유하는 자료 구조 (Java 17 · 의존성 0)
-  ⬜ hindsight-recorder-simple  v0 기록기 — Filter + DataSource 감싸기
-  ⬜ hindsight-agent-boot       부트스트랩 껍데기 (Java 17)              [v1]
-  ⬜ hindsight-agent            premain · ByteBuddy(셰이딩) · 링 버퍼    [v1]
+  ✅ hindsight-model      안팎이 공유하는 자료 구조 (Java 17 · 의존성 0)
+  ⬜ hindsight-agent-boot 부트스트랩 껍데기 (Java 17)              [v1] ✅꼭 필요
+  ⬜ hindsight-agent      premain · ByteBuddy(셰이딩) · 링 버퍼    [v1] ✅꼭 필요
+  ⬜ v0 기록기            Filter + DataSource 감싸기        ⬜ 모듈일지 미정
 
 바깥에서 도는 것
-  ✅ hindsight-core             읽기 · 재생 · 오라클 · 진단 · 채점 · 명령어
-                                 └ 안은 패키지로: store · privacy · replay
-                                                 · guard · brain · cli · mcp
-  ⬜ demo-app                   관측 대상. 🔴 진짜 스프링 서비스로 만듭니다  ← 다음
+  ✅ hindsight-core       읽기 · 재생 · 오라클 · 진단 · 채점 · 명령어
+                            └ 안은 패키지로: store · privacy · replay
+                                            · guard · brain · cli · mcp
+  ⬜ demo-app             관측 대상. 🔴 진짜 스프링 서비스로 만듭니다   ← 다음
 ```
+
+🔴 **꼭 나눠야 하는 것은 `agent`·`agent-boot` 둘뿐이고, 둘 다 v1 입니다.**
+`model` 은 v1 을 위한 규율이고(합쳐 두면 v1 에 레코드 여덟 개를 손봐야 합니다),
+v0 기록기는 **아직 안 정했습니다** — 코드가 없는데 미리 정하지 않습니다.
+⚠️ **지금 디스크에 실제로 있는 모듈은 2개입니다.**
 
 ⚠️ **폴더는 첫 파일을 쓸 때 만듭니다.** 빈 폴더는 「누가 시작해 놨나」로 읽혀서 다음 사람이
 매번 열어 봐야 합니다. 지도는 디스크가 아니라

@@ -31,10 +31,13 @@ include("hindsight-core")      // 읽기 · 재생 · 오라클 · 진단 · 채
 // ── 아직 없는 모듈 — 첫 파일을 쓸 때 폴더와 함께 여기 추가한다 ────────────
 //
 //   v0  demo-app                   관측 대상. 🔴 진짜 스프링 서비스로 만든다
-//   v0  hindsight-recorder-simple  Filter + DataSource 감싸기
-//                                  🔴 demo-app «안»으로 들어간다. 그래서 따로다 —
-//                                     core 에 넣으면 Spring AI 와 picocli 가
-//                                     관측 대상 앱으로 딸려 들어간다
+//
+//   v0  v0 기록기 (Filter + DataSource 감싸기)
+//       ⬜ 🔴 «모듈일지 demo-app 안의 패키지일지 아직 안 정했다. 만들 때 정한다.»
+//          한때 「demo-app 안으로 들어가니 따로여야 한다」고 적었는데 그 이유가 성립을 안 한다 —
+//          기록을 저장하려면 core 의 코덱이 필요하고, 그러면 모듈을 나눠도 Spring AI 와
+//          picocli 가 demo-app 으로 딸려 간다. 남는 이유는 취향뿐이다.
+//          🧭 docs/rules/module-boundary-decision.md §6-2
 //   v1  hindsight-agent-boot       부트스트랩 클래스로더에 올라간다. Java 17 · 의존성 0
 //                                  🔴 «다른 클래스로더»라 같은 jar 에 못 넣는다
 //   v1  hindsight-agent            premain · ByteBuddy(셰이딩) · 링 버퍼. Java 17
