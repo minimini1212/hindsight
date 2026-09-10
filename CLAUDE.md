@@ -52,7 +52,7 @@ goes stale, and a stale rule is worse than no rule: the next session reads it as
 | **What are the modules, what does each stage take and return, what gets built first?** | `docs/DESIGN.md` **(read before writing code)** |
 | Recording file structure, field names, schema version, env vars | `docs/DATA_CONTRACT.md` **(read before writing code)** |
 | **Why is *this* shaped this way?** (decision history, reversals) | `docs/rules/<area>-decision.md` — index: `docs/rules/README.md` |
-| How does the code that exists fit together? | `docs/00_CODE_WALKTHROUGH.md` (written once code exists) |
+| **Where is everything, and why does each module exist?** | `docs/00_CODE_WALKTHROUGH.md` **(start here; update it in the same commit as the code)** |
 | Current state, deferred work, pending decisions | `TODOS.md` (top section) |
 | What happened on a given day | `docs/reports/daily/REPORT_<date>.md` |
 | What a review found and what was done about it | `docs/review/` |
@@ -156,9 +156,20 @@ propose one.
   codebases serialize the same schema; without this test they drift silently.
 - **When behavior or a contract changes, update the owning doc in the same change.**
 
+### 🔴 Create a folder only when you write its first file
+
+Never pre-create empty module or package folders. An empty folder reads as "someone started
+this", so the next person opens it to find out — every time. No folder, no question.
+The map of what goes where lives in `docs/00_CODE_WALKTHROUGH.md` §2, not on disk.
+`settings.gradle.kts` lists only modules that have files; the rest are comments there.
+
+(This rule exists because 13 modules were pre-created on 2026-09-10, producing 56 empty
+folders and the question "what are all these?" — then deleted.)
+
 ## Before changing anything
 
-1. Read `docs/DESIGN.md` for the stage you are touching.
-2. Read `docs/DATA_CONTRACT.md` if a recording field is involved.
-3. Run `git status --short` — the user may have edits in flight.
-4. Read the test next to the file you are about to change.
+1. Read `docs/00_CODE_WALKTHROUGH.md` §2 to see where the thing you are adding belongs.
+2. Read `docs/DESIGN.md` for the stage you are touching.
+3. Read `docs/DATA_CONTRACT.md` if a recording field is involved.
+4. Run `git status --short` — the user may have edits in flight.
+5. Read the test next to the file you are about to change.

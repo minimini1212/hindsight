@@ -61,6 +61,7 @@ Keploy · ReCrash(2008) · 테스트 카빙 · JFR · APM · Sentry Autofix. **�
 
 | 궁금한 것 | 파일 |
 | --- | --- |
+| **어디에 무엇이 있고 왜 그 모듈이 있나** | [docs/00_CODE_WALKTHROUGH.md](docs/00_CODE_WALKTHROUGH.md) ← **처음이면 여기부터** |
 | 왜 만드나, 비슷한 것들과 뭐가 다른가 | [docs/PRD.md](docs/PRD.md) |
 | 모듈·단계·무엇을 먼저 만드나 | [docs/DESIGN.md](docs/DESIGN.md) |
 | 기록 파일의 구조, 환경변수 | [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md) |
@@ -69,23 +70,28 @@ Keploy · ReCrash(2008) · 테스트 카빙 · JFR · APM · Sentry Autofix. **�
 | 지금 어디까지 왔나 | [TODOS.md](TODOS.md) |
 | 코드를 고칠 때 지킬 것 | [CLAUDE.md](CLAUDE.md) |
 
-## 구성
+## 구성 — 🔴 지금 있는 것은 셋뿐입니다
 
 ```
-hindsight-model            기록 자료 구조 (Java 17 · 🔴 Jackson 애너테이션 금지)
-hindsight-core             기록 읽기·쓰기·가명화
-hindsight-recorder-simple  v0 기록기 — Filter + DataSource 감싸기 (바이트코드 없음)
-hindsight-replay           재생 · 오라클 · 테스트 생성
-hindsight-guard            🔴 패치 경로 검사. 파일을 쓰는 유일한 통로
-hindsight-brain            진단 · 채점 고리 · PR
-hindsight-cli              hs 명령어
-hindsight-agent-boot       🔴 부트스트랩 껍데기 (Java 17 · 의존성 없음)   [v1]
-hindsight-agent            premain · ByteBuddy(셰이딩) · 링 버퍼         [v1]
-hindsight-mcp              코딩 에이전트용 통로                          [v3]
-hindsight-server           저장소 · REST · 화면                          [v3]
-hindsight-testkit          기록 픽스처와 테스트 도우미
-demo-app                   🔴 진짜 스프링 서비스. 소품이 아니다
+✅ hindsight-model            기록 자료 구조 (Java 17 · Jackson 애너테이션 없음)
+✅ hindsight-core             기록 읽기·쓰기 · 판 번호 검사
+✅ hindsight-testkit          기록 표본과 테스트 도우미
+
+⬜ demo-app                   관측 대상. 🔴 진짜 스프링 서비스로 만듭니다   ← 다음
+⬜ hindsight-recorder-simple  v0 기록기 — Filter + DataSource 감싸기 (바이트코드 없음)
+⬜ hindsight-replay           재생 · 오라클 · 테스트 생성
+⬜ hindsight-guard            🔴 패치 경로 검사. 파일을 쓰는 유일한 통로
+⬜ hindsight-brain            진단 · 채점 고리 · PR
+⬜ hindsight-cli              hs 명령어
+⬜ hindsight-agent-boot       🔴 부트스트랩 껍데기 (Java 17)          [v1]
+⬜ hindsight-agent            premain · ByteBuddy(셰이딩) · 링 버퍼   [v1]
+⬜ hindsight-mcp              코딩 에이전트용 통로                     [v3]
+⬜ hindsight-server           저장소 · REST · 화면                     [v3]
 ```
+
+⚠️ **폴더는 첫 파일을 쓸 때 만듭니다.** 빈 폴더를 미리 만들어 두지 않습니다 — 「누가 시작해
+놨나」로 읽혀서 다음 사람이 매번 열어 봐야 하기 때문입니다. 각 모듈이 왜 따로 있고 언제
+만드는지는 [00_CODE_WALKTHROUGH.md §2](docs/00_CODE_WALKTHROUGH.md) 에 있습니다.
 
 ## 시작하기
 
