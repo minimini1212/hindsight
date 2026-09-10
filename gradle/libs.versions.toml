@@ -1,0 +1,32 @@
+# 의존성 버전은 여기 한 곳에서만 정한다.
+# 🔴 아래 숫자는 설계 시점의 값이고 실제로 받아본 적이 없다.
+#    첫 빌드 전에 각 버전이 실재하는지 확인하고, 고친 뒤 이 주석을 지운다.
+
+[versions]
+java-modern = "25"     # 대부분의 모듈
+java-agent = "17"      # 🔴 에이전트·모델만. 남의 앱에 붙으므로 호환 범위를 넓게 둔다
+
+bytebuddy = "1.15.11"  # 에이전트가 쓰는 유일한 외부 의존성. 셰이딩해서 넣는다
+jackson = "2.18.2"     # 🔴 에이전트에는 절대 안 들어간다. 바깥 모듈 전용
+junit = "5.11.4"
+assertj = "3.26.3"
+picocli = "4.7.6"
+springboot = "3.4.1"
+springai = "1.0.0"
+shadow = "8.3.5"       # 셰이딩 플러그인 (com.gradleup.shadow)
+
+[libraries]
+bytebuddy = { module = "net.bytebuddy:byte-buddy", version.ref = "bytebuddy" }
+bytebuddy-agent = { module = "net.bytebuddy:byte-buddy-agent", version.ref = "bytebuddy" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
+
+[plugins]
+springboot = { id = "org.springframework.boot", version.ref = "springboot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version = "1.1.7" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
