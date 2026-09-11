@@ -178,6 +178,24 @@ propose one.
 - Commit messages in Korean, with the request count when a run went out:
   `fix(에이전트): 계측 예외가 앱으로 새던 자리 — 요청 0건`
 
+#### Branches — `dev` is the base, and nothing is committed onto it directly
+
+Set 2026-09-11. `dev` is the default branch on GitHub; `main` is the released line.
+
+- 🔴 **Never commit onto `dev` or `main`.** Branch first, always — even for a one-line fix.
+- Name: `<type>/<english-kebab-slug>`, 2–4 words. The type is the same word the commit
+  message uses (`feat` · `fix` · `docs` · `build` · `refactor`), so
+  `git log --oneline dev..HEAD` reads as one story.
+- 🔴 **Branch names are the one repo artifact that stays English.** They become URLs, CI job
+  names and docker tags, where Korean turns into percent-encoding nobody can read.
+  Commit messages, docs and comments stay Korean.
+- Branch off `dev`, PR into `dev`. `git switch dev && git pull && git switch -c feat/…`
+- A branch is one topic. If a fix is unrelated to what the branch is named after, it belongs
+  on its own branch — that is what makes a revert possible later.
+- 🔴 **Before asking for a commit, check that the work is actually on the remote.**
+  `git branch -r --contains <sha>` answers it; a local branch that looks pushed is the
+  quietest way to lose a day's work.
+
 ---
 
 ## Code and verification
