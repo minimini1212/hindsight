@@ -324,6 +324,7 @@ N+1을 고치는 정석은 질의 201개를 **조인 한 개**로 바꾸는 것�
 | `HINDSIGHT_AGENT_ERROR_LIMIT` | 50 | 이만큼 실패하면 계측을 스스로 끈다 |
 | `HINDSIGHT_PSEUDONYM_KEY` | *(없음)* | 🔴 `.env`. 없으면 **가명화 대상 필드를 통째로 버린다** |
 | `HINDSIGHT_LLM_MAX_ATTEMPTS` | 3 | 패치 시도 횟수 |
+| `HINDSIGHT_LLM_MAX_USD` | **1.0** | 🔴 기록 하나당 비용 상한. 넘으면 멈추고 사람을 부른다. 「돈이 떨어져 멈췄다」와 「못 고쳤다」를 **다르게 적는다** |
 | `HINDSIGHT_PATCH_ALLOWED_PATHS` | `src/main/**` | 🔴 LLM이 고칠 수 있는 경로 |
 
 🔴 **값을 못 읽으면 멈춘다.** 기본값으로 조용히 되돌아가지 않는다.
