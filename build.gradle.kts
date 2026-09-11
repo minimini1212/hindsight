@@ -68,6 +68,67 @@ subprojects {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// 🔴 문서의 링크가 실재하는지 빌드가 직접 본다
+//
+// 이 프로젝트는 문서가 서로를 많이 가리킨다 — 설계가 결정 기록을, 결정 기록이 실측을,
+// 실측이 트러블슈팅을. 그런데 파일을 옮기면 그 링크들이 «조용히» 끊어진다.
+// 끊어진 것을 알아채는 시점은 누군가 그 링크를 눌러 보는 순간이고, 그때는 이미 한참 뒤다.
+//
+// 설계 리뷰가 이 프로젝트에서 지적한 것 중 하나가 정확히 이거였다 —
+// 「문서가 존재하지 않는 파일 셋을 가리키고 있다」.
+//
+// 2026-09-11 문서를 날짜 폴더로 옮기면서 상대 경로 다섯 개가 한 번에 어긋났다.
+// 손으로 확인해서 찾았지만, 손으로 하는 확인은 언젠가 안 한다.
+// ────────────────────────────────────────────────────────────────────────────
+val docsRoot = projectDir
+
+tasks.register("checkDocLinks") {
+    group = "verification"
+    description = "문서의 상대 링크가 실재하는 파일을 가리키는지 본다"
+
+    doLast {
+        val linkPattern = Regex("""\]\(([^)\s]+)\)""")
+        val skipped = setOf("build", ".git", ".gradle", ".idea")
+        val broken = mutableListOf<String>()
+
+        docsRoot.walkTopDown()
+            .onEnter { it.name !in skipped }
+            .filter { it.isFile && it.extension == "md" }
+            .forEach { markdown ->
+                linkPattern.findAll(markdown.readText()).forEach { match ->
+                    val raw = match.groupValues[1]
+                    // 바깥 주소와 문서 안 앵커(#절)는 우리가 확인할 수 있는 게 아니다
+                    if (raw.startsWith("http") || raw.startsWith("mailto:") || raw.startsWith("#")) {
+                        return@forEach
+                    }
+                    val target = raw.substringBefore('#')
+                    if (target.isBlank()) return@forEach
+
+                    if (!File(markdown.parentFile, target).exists()) {
+                        broken += "  ${markdown.relativeTo(docsRoot).invariantSeparatorsPath}  →  $target"
+                    }
+                }
+            }
+
+        if (broken.isNotEmpty()) {
+            throw GradleException(
+                """
+                |문서가 없는 파일을 가리킨다 (${broken.size}곳):
+                |
+                |${broken.joinToString("\n")}
+                |
+                |파일을 옮겼다면 «깊이»가 바뀌었는지 보라 — docs/reports/2026-09-11/a.md 에서
+                |docs/rules/ 로 가려면 ../../rules/ 이지 ../rules/ 가 아니다.
+                """.trimMargin()
+            )
+        }
+    }
+}
+
+// 🔴 check 에 건다. 「돌리는 것을 기억해야 하는 검사」는 언젠가 안 돌린다.
+tasks.named("check") { dependsOn("checkDocLinks") }
+
+// ────────────────────────────────────────────────────────────────────────────
 // 🔴 에이전트 의존성 금지선을 빌드가 직접 지킨다
 //
 // 규율 파일에 "의존성 0" 이라고 적어두는 것만으로는 지켜지지 않는다.

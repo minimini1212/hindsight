@@ -150,7 +150,9 @@ propose one.
   multi-step flow (the ring buffer, the replay pipeline, the verification loop).
   🔴 **A stale diagram is worse than none** — update it in the same commit as the code.
 - Run `./gradlew :<changed-module>:test` while working. Run `./gradlew build` once before
-  asking for a commit — not after every edit.
+  asking for a commit — not after every edit. That run includes `checkDocLinks` and
+  `checkAgentDependencies`, so **a commit that breaks a doc link or the agent's dependency
+  line cannot pass a full build.**
 - 🔴 **A round-trip test is mandatory** for the recording format: what the agent's hand-written
   JSON writer produces must parse back to an equal object through `hindsight-core`. Two
   codebases serialize the same schema; without this test they drift silently.
@@ -183,6 +185,24 @@ docs/
   troubleshooting gets buried under a date nobody remembers.
 - 🔴 **Never write the same thing in two places.** If a measurement changes the design,
   edit the design doc and leave only "what we measured and why it changed" in the report.
+
+### 🔴 A document that points at a file that isn't there is a defect
+
+The docs here point at each other constantly — design → decision record → measurement →
+troubleshooting. **Move one file and those links break silently.** Nobody finds out until
+someone clicks one, which is long after.
+
+This is not hypothetical: the design review's finding list included *"three referenced
+documents do not exist on disk"*, and moving docs into date folders on 2026-09-11 broke
+five relative paths at once.
+
+- **The build checks it.** `./gradlew checkDocLinks` (wired into `check`) fails on any
+  relative link whose target is missing. 🔴 **Do not "fix" a failure by deleting the link** —
+  a pointer to something that should exist is information; a missing pointer is not.
+- **After moving any document, run it before you commit.** The usual breakage is *depth*:
+  from `docs/reports/<date>/a.md` the rules folder is `../../rules/`, not `../rules/`.
+- A rule the build cannot check is a rule that eventually is not followed. That is why this
+  one, and the agent dependency line, are Gradle tasks and not paragraphs.
 
 ### 🔴 Create a folder only when you write its first file
 
