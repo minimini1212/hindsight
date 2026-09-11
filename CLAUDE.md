@@ -173,8 +173,23 @@ propose one.
 
 ### Git
 
-- **The user pushes. Claude never pushes.**
-- **Commit only when the user explicitly asks.** 🔴 Never `git add .` — stage named paths.
+- **Finishing a unit of work on a `<type>/<slug>` branch means: stage named paths, commit,
+  and `git push -u origin <that branch>`.** Changed by the user 2026-09-11, replacing
+  "the user pushes, Claude never pushes" — a local commit that looks pushed is the quietest
+  way to lose a day's work, and checking `git branch -r --contains <sha>` after the fact
+  only catches it if someone remembers to look.
+  - 🔴 **Only the branch that was just worked on.** Never `git push` `dev` or `main`,
+    never `--force` / `--force-with-lease`, never `push --delete`. Rewriting or deleting
+    what is already on the remote is the one thing a push must not do.
+  - 🔴 **Never `git add .`** — stage named paths, every time. A push makes a stray
+    staged file everyone else's problem.
+  - **Opening the PR stays the user's action.** Push puts the work somewhere safe;
+    merging into `dev` is a decision, and decisions are theirs.
+  - Report the branch name and the pushed SHA when the work is done, so there is nothing
+    to verify by hand.
+- **Commit only when the work is actually finished**, not at every edit — one commit is one
+  topic, the same topic the branch is named after. `./gradlew build` passes first
+  (that run includes `checkDocLinks` and `checkAgentDependencies`).
 - Commit messages in Korean, with the request count when a run went out:
   `fix(에이전트): 계측 예외가 앱으로 새던 자리 — 요청 0건`
 
@@ -192,9 +207,9 @@ Set 2026-09-11. `dev` is the default branch on GitHub; `main` is the released li
 - Branch off `dev`, PR into `dev`. `git switch dev && git pull && git switch -c feat/…`
 - A branch is one topic. If a fix is unrelated to what the branch is named after, it belongs
   on its own branch — that is what makes a revert possible later.
-- 🔴 **Before asking for a commit, check that the work is actually on the remote.**
-  `git branch -r --contains <sha>` answers it; a local branch that looks pushed is the
-  quietest way to lose a day's work.
+- 🔴 **The branch does not exist for anyone else until it is pushed.** That is why
+  finishing work now ends in a push (see the Git rules above). `git branch -r --contains <sha>`
+  is how you confirm it landed — run it when a push errors out, not instead of pushing.
 - 🔴 **Merged branches are kept, not deleted — local and remote both.** The user's call,
   2026-09-11. A branch name is a label on a piece of work that a commit range is not:
   `feat/replay-state-restore` says what those two commits were *for*, and it stays
