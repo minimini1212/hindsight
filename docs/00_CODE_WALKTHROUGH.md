@@ -344,7 +344,7 @@ Jackson 에게 종류를 알려주는 흔한 방법은 클래스 이름을 적�
 | 자바 21/17 이중 툴체인, 25 를 안 쓴 이유, 파생 메서드 이름 규칙 | [`rules/stack-decision.md`](rules/stack-decision.md) |
 | 기록 파일의 필드 하나하나, 「모름」의 표현, 상한값 | [`DATA_CONTRACT.md`](DATA_CONTRACT.md) |
 | 단계 · 오라클 · 채점 네 겹 · 개인정보 | [`DESIGN.md`](DESIGN.md) |
-| 설계 리뷰에서 무엇이 무너졌고 무엇을 고쳤나 | [`review/2026-09-10-design-review.md`](review/2026-09-10-design-review.md) |
+| 설계 리뷰에서 무엇이 무너졌고 무엇을 고쳤나 | [`reports/2026-09-10/design-review.md`](reports/2026-09-10/design-review.md) |
 | 지금 어디까지 왔나, 다음에 뭘 하나 | [`../TODOS.md`](../TODOS.md) |
 
 ---

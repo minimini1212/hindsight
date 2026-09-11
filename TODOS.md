@@ -30,11 +30,11 @@
 - ✅ **`Filter` + `DataSource` 감싸기로 만든 기록으로 재생이 성립하는가**
   — 🎯 **2026-09-11 실측: 성립한다.** 본문을 잡고도 앱이 200 을 돌려주고, 잡은 것«만»으로
   재생하니 읽기 요청은 **글자까지 동일**했다. 바이트코드를 v1 로 미룬 근거가 유지된다.
-  🧭 [reports/2026-09-11_http-capture-experiment.md](docs/reports/2026-09-11_http-capture-experiment.md)
+  🧭 [reports/2026-09-11/http-capture-experiment.md](docs/reports/2026-09-11/http-capture-experiment.md)
 - ✅ **오라클(설계 §6-1)이 실제로 N+1을 잡는가** — 🎯 **2026-09-11 실측: 잡는다.**
   주문 20건 → SQL 21번(1+20), 두 번 돌려도 21/21, **두 배로 안 세인다.**
   🔄 그리고 「모양별 반복」이 「총 횟수」보다 나은 신호라는 걸 알아내 오라클을 다듬었다.
-  🧭 [reports/2026-09-11_sql-count-experiment.md](docs/reports/2026-09-11_sql-count-experiment.md)
+  🧭 [reports/2026-09-11/sql-count-experiment.md](docs/reports/2026-09-11/sql-count-experiment.md)
 
 ---
 
@@ -105,7 +105,7 @@
   지금 네 등급(`VERIFIED_DETERMINISTIC`·`PARTIAL`·`DIVERGED`·`FAILED`) 어디에도 안 맞는다.
   🔴 안 정하면 **쓰기 요청에서 난 사고는 전부 「안 고쳐졌다」로 판정된다** — 아무리 잘 고쳐도.
   후보: 매번 달라지는 자리(`id`)를 빼고 비교 / 예외가 사라졌나만 본다 / SQL 모양 변화만 본다.
-  🧭 [reports/2026-09-11_http-capture-experiment.md](docs/reports/2026-09-11_http-capture-experiment.md) §3
+  🧭 [reports/2026-09-11/http-capture-experiment.md](docs/reports/2026-09-11/http-capture-experiment.md) §3
 
 - 🔄 **v0 기록기를 따로 모듈로 둘 것인가** — 「demo-app 안으로 들어가니 따로」라는 이유를
   댔다가 스스로 뒤집었다. 기록을 저장하려면 어차피 `core` 의 코덱이 필요해서 **모듈을 나눠도

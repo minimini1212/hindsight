@@ -1,7 +1,7 @@
 # 2026-09-11 실측 2 — Filter 로 잡은 것이 재생에 쓸 만한가
 
 > TODOS 의 「먼저 확인해야 결정이 유지되는 것」 중 **남은 하나**였다.
-> 이게 안 되면 바이트코드를 v1 로 미룬 근거([만드는 순서 결정](../rules/build-order-decision.md) §5)가 사라진다.
+> 이게 안 되면 바이트코드를 v1 로 미룬 근거([만드는 순서 결정](../../rules/build-order-decision.md) §5)가 사라진다.
 > 코드: `demo-app/src/test/java/io/hindsight/demo/experiment/HttpTap.java`
 
 ## §1 진짜 걱정이었던 것 — 본문은 한 번만 읽을 수 있다

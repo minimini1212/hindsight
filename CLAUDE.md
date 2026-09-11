@@ -54,8 +54,8 @@ goes stale, and a stale rule is worse than no rule: the next session reads it as
 | **Why is *this* shaped this way?** (decision history, reversals) | `docs/rules/<area>-decision.md` — index: `docs/rules/README.md` |
 | **Where is everything, and why does each module exist?** | `docs/00_CODE_WALKTHROUGH.md` **(start here; update it in the same commit as the code)** |
 | Current state, deferred work, pending decisions | `TODOS.md` (top section) |
-| What happened on a given day | `docs/reports/daily/REPORT_<date>.md` |
-| What a review found and what was done about it | `docs/review/` |
+| **What happened on a given day** (measurements, reviews, troubleshooting) | `docs/reports/<YYYY-MM-DD>/` — index: `docs/reports/README.md` |
+| **How do I get past this error again** | `docs/reports/<YYYY-MM-DD>/troubleshooting/<symptom>.md` |
 
 If a rule below conflicts with a source-of-truth doc, **the doc wins** — then fix this file.
 
@@ -155,6 +155,34 @@ propose one.
   JSON writer produces must parse back to an equal object through `hindsight-core`. Two
   codebases serialize the same schema; without this test they drift silently.
 - **When behavior or a contract changes, update the owning doc in the same change.**
+
+### 🔴 Where each kind of writing goes
+
+```
+docs/
+├── PRD.md · DESIGN.md · DATA_CONTRACT.md · 00_CODE_WALKTHROUGH.md
+│                              "what it is now" — no history here
+├── rules/<area>-decision.md   "why we chose this" — BY TOPIC, not by date
+└── reports/
+    ├── README.md              the index — every new file gets a row
+    └── <YYYY-MM-DD>/          "what happened that day"
+        ├── <topic>.md         measurements, reviews, the numbers that came out
+        └── troubleshooting/
+            └── <symptom>.md   "we got stuck, here's how we got out"
+```
+
+- **One folder per day.** Create it the day you write the first file for it.
+  A day with three topics gets three files, not one long one.
+- 🔴 **Name a troubleshooting file after the SYMPTOM, not the cause.**
+  Next time you search by what you see, not by what it turned out to be —
+  if you knew the cause you would not be searching.
+  `테스트-출력의-한글이-깨진다.md` ⭕ / `인코딩-설정.md` ❌
+- 🔴 **Every troubleshooting file records the approach that FAILED**, not just the fix.
+  That is the part that saves the next person a day.
+- **Add a row to `docs/reports/README.md`** in the same commit. Without the index,
+  troubleshooting gets buried under a date nobody remembers.
+- 🔴 **Never write the same thing in two places.** If a measurement changes the design,
+  edit the design doc and leave only "what we measured and why it changed" in the report.
 
 ### 🔴 Create a folder only when you write its first file
 
