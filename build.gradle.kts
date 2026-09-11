@@ -6,7 +6,8 @@ plugins {
 }
 
 // 🔴 남의 JVM 안에 들어가는 모듈만 Java 17. 호환 범위를 넓게 둔다.
-//    나머지는 25. 설계의 모듈 표(§3) 참조.
+//    나머지는 21. 설계의 모듈 표(§3) 참조. 25 에서 21 로 내린 이유는
+//    docs/rules/stack-decision.md 에 있다.
 val agentModules = setOf("hindsight-model", "hindsight-agent", "hindsight-agent-boot")
 
 allprojects {
