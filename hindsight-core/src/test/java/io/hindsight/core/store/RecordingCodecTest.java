@@ -161,8 +161,29 @@ class RecordingCodecTest {
                     .isFalse();
         }
 
+        @Test
+        @DisplayName("🔴 상태를 안 되돌리고 얻은 「같았다」로는 안 열린다")
+        void doesNotOpenWhenStateWasNotRestored() {
+            assertThat(new ReplayInfo(ReplayInfo.Grade.VERIFIED_DETERMINISTIC, null, true, null,
+                    null, null, null).allowsAutoPullRequest())
+                    .as("🔴 stateRestore 가 null 인 것은 「되돌렸다」가 아니라 «안 봤다» 이다")
+                    .isFalse();
+
+            assertThat(new ReplayInfo(ReplayInfo.Grade.VERIFIED_DETERMINISTIC, null, true, null,
+                    new ReplayInfo.StateRestore(true, false, null, null), null, null).allowsAutoPullRequest())
+                    .as("행만 되돌린 것은 되돌린 게 아니다 — id 가 어긋나서 재생이 죽는다")
+                    .isFalse();
+
+            assertThat(new ReplayInfo(ReplayInfo.Grade.VERIFIED_DETERMINISTIC, null, true, null,
+                    new ReplayInfo.StateRestore(true, true, null, null), null, null).allowsAutoPullRequest())
+                    .as("행과 카운터를 되돌렸으면 v0 이 되돌릴 수 있는 만큼은 다 되돌린 것이다")
+                    .isTrue();
+        }
+
+        /** 복원선을 넘긴 기록. 자동 PR 조건에서 «복원 말고» 무엇이 남는지를 보려고 고정한다. */
         private ReplayInfo replay(ReplayInfo.Grade grade, Boolean baselineFailed) {
-            return new ReplayInfo(grade, null, baselineFailed, null, null, null);
+            return new ReplayInfo(grade, null, baselineFailed, null,
+                    new ReplayInfo.StateRestore(true, true, null, null), null, null);
         }
     }
 }

@@ -45,7 +45,8 @@ docs/reports/
 | 무엇 | 결과 |
 | --- | --- |
 | [SQL 세기 실측](2026-09-11/sql-count-experiment.md) | ✅ 21 = 1+20. **두 배로 안 세인다.** 🎯 「모양별 반복」이 더 나은 신호라는 걸 알아내 오라클을 다듬었다 |
-| [Filter 포획 실측](2026-09-11/http-capture-experiment.md) | ✅ 재생 성립. 🔴 **쓰기 요청은 채점할 방법이 없다**는 구멍을 찾았다 |
+| [Filter 포획 실측](2026-09-11/http-capture-experiment.md) | ✅ 재생 성립. 🔴 쓰기 요청을 채점할 방법이 없다고 봤다 — **실험 ⑦ 에서 뒤집힘** |
+| 🔄 [**쓰기 재생 실측**](2026-09-11/write-replay-experiment.md) | 🔴 **위 결론을 뒤집었다.** 원인은 「쓰기라서」가 아니라 「안 되돌려서」. 되돌리니 **글자까지 같다** |
 | 🧭 [**인수인계**](2026-09-11/handoff.md) | **다음 세션이 이어받는 법.** 읽는 순서 · 환경 · 지금 손에 든 것 |
 
 ### [2026-09-10](2026-09-10/)
@@ -62,5 +63,6 @@ docs/reports/
 | 증상 | 언제 |
 | --- | --- |
 | [테스트 출력의 한글이 `?? ?? ??` 로 깨진다](2026-09-11/troubleshooting/gradle-테스트-한글-깨짐.md) | 09-11 |
+| [`JAVA_HOME is set to an invalid directory` — 경로는 맞는데 그렇게 나온다](2026-09-11/troubleshooting/JAVA_HOME이-올바른-디렉터리가-아니라고-나온다.md) | 09-11 |
 | [빌드가 `IBM_SEMERU` 한 줄만 남기고 죽는다](2026-09-10/troubleshooting/gradle-빌드가-IBM_SEMERU-만-남기고-죽는다.md) | 09-10 |
 | [`record` 에 없는 필드가 JSON 에 나타나서 왕복이 깨진다](2026-09-10/troubleshooting/record에-없는-필드가-JSON에-나타난다.md) | 09-10 |

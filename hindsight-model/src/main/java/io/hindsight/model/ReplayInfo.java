@@ -13,6 +13,8 @@ import java.util.List;
  * @param missing        무엇을 못 잡았는지 이름. 🔴 빈 목록(「보았고 다 잡았다」)과
  *                       {@code null}(「대조를 아직 안 했다」)은 다른 사실이다.
  * @param baselineFailed 🔴 {@link #baselineFailed()} 설명 참조. {@code null} 이면 아직 안 돌려봤다.
+ * @param stateRestore   🔴 재생 «전»에 상태를 어디까지 되돌렸나. {@code null} 이면 안 봤다.
+ *                       되돌리지 않고 돌린 재생이 원본과 다른 것은 패치 탓이 아니다.
  * @param staleAfter     이 시각이 지나면 「낡았다」고 표시한다. 막지는 않는다.
  */
 public record ReplayInfo(
@@ -20,6 +22,7 @@ public record ReplayInfo(
         List<String> missing,
         Boolean baselineFailed,
         Divergence diverged,
+        StateRestore stateRestore,
         Instant staleAfter,
         String notes
 ) {
@@ -72,6 +75,41 @@ public record ReplayInfo(
     }
 
     /**
+     * 🔴 재생을 돌리기 «전»에 상태를 어디까지 되돌렸나.
+     *
+     * <h2>왜 이게 필요한가</h2>
+     * 재생은 요청을 다시 보내는 게 아니라 <b>기록 시점 상태로 되돌린 뒤</b> 다시 보내는 것이다.
+     * 되돌리지 않으면 같은 요청이 다른 답을 낸다 — 그리고 그건 패치가 아니라 우리가 만든 차이다.
+     * 그걸 「안 고쳐졌다」로 읽으면 아무 잘못 없는 패치가 벌을 받는다.
+     *
+     * <h2>🔴 {@code identityCounters} 가 왜 따로 있나</h2>
+     * 행을 <b>같은 내용·같은 개수로</b> 복원해도, DB 가 들고 있는 「다음 id 는 몇 번」이라는
+     * 숫자는 안 돌아간다. 그러면 행에 붙는 id 가 어긋나고, 기록에 담긴 {@code memberId: 1} 이
+     * 가리키는 것이 사라져서 <b>재생이 예외로 죽는다.</b> 행을 되돌리는 것은 상태를 되돌리는 것이 아니다.
+     *
+     * <p>세 값은 서로 다른 사실이다. {@code true} 되돌렸다 / {@code false} 보았고 못 되돌렸다 /
+     * {@code null} 🔴 <b>안 봤다.</b> 데이터 계약 §7-3.
+     *
+     * @param caches   앱 안에 쌓인 캐시. v0 범위 밖이라 보통 {@code null} 이다
+     * @param external 외부 시스템. v1 부터
+     */
+    public record StateRestore(Boolean rows, Boolean identityCounters, Boolean caches, Boolean external) {
+
+        /**
+         * 채점을 걸어도 되는 최소 복원선.
+         *
+         * <p>🔴 {@code caches}·{@code external} 을 여기 넣지 않는 이유: v0 은 그 둘을 되돌릴
+         * 수단이 아예 없다. 넣으면 모든 기록이 영원히 이 선을 못 넘어서, 조건이 검사가 아니라
+         * 장식이 된다. 대신 못 되돌린 것은 {@code missing} 에 이름으로 남는다.
+         *
+         * <p>{@code null} 을 {@code true} 로 치지 않는다 — 「안 봤다」는 「되돌렸다」가 아니다.
+         */
+        public boolean restoredEnoughToGrade() {
+            return Boolean.TRUE.equals(rows) && Boolean.TRUE.equals(identityCounters);
+        }
+    }
+
+    /**
      * 이 기록으로 얻은 패치를 사람 손 없이 PR 로 올려도 되나.
      *
      * <p>🔴 자동 PR 은 <b>등급이 실측으로 확인됐고 기준선이 정말 실패했을 때만</b> 열린다.
@@ -79,6 +117,11 @@ public record ReplayInfo(
      * 느슨해진 그 한 곳이 잘못된 패치를 운영 저장소로 밀어 넣는다.
      */
     public boolean allowsAutoPullRequest() {
-        return grade == Grade.VERIFIED_DETERMINISTIC && Boolean.TRUE.equals(baselineFailed);
+        return grade == Grade.VERIFIED_DETERMINISTIC
+                && Boolean.TRUE.equals(baselineFailed)
+                // 🔴 되돌리지 않은 자리에서 나온 「같았다」는 우연이다. 규율을 글로만 적으면
+                //    언젠가 안 지켜지므로 여기서 막는다. stateRestore 가 null 이면 «안 봤다» 이고,
+                //    안 본 것을 「괜찮았다」로 치는 것이 이 프로젝트가 겨누는 결함 그 자체다.
+                && stateRestore != null && stateRestore.restoredEnoughToGrade();
     }
 }
