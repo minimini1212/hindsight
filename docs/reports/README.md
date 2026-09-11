@@ -64,5 +64,6 @@ docs/reports/
 | --- | --- |
 | [테스트 출력의 한글이 `?? ?? ??` 로 깨진다](2026-09-11/troubleshooting/gradle-테스트-한글-깨짐.md) | 09-11 |
 | [`JAVA_HOME is set to an invalid directory` — 경로는 맞는데 그렇게 나온다](2026-09-11/troubleshooting/JAVA_HOME이-올바른-디렉터리가-아니라고-나온다.md) | 09-11 |
+| [`git push` 가 아무 말 없이 멈춘다 · WSL 에서는 `could not read Username`](2026-09-11/troubleshooting/git-push-가-아무-말-없이-멈춘다.md) | 09-11 |
 | [빌드가 `IBM_SEMERU` 한 줄만 남기고 죽는다](2026-09-10/troubleshooting/gradle-빌드가-IBM_SEMERU-만-남기고-죽는다.md) | 09-10 |
 | [`record` 에 없는 필드가 JSON 에 나타나서 왕복이 깨진다](2026-09-10/troubleshooting/record에-없는-필드가-JSON에-나타난다.md) | 09-10 |
