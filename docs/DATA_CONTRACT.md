@@ -291,6 +291,12 @@ DB 가 들고 있는 「다음 `id` 는 몇 번」이라는 숫자는 안 돌아
 어긋나고, 기록에 담긴 `memberId: 1` 이 가리키는 것이 사라져서 **재생이 예외로 죽는다.**
 🧭 세 갈래로 잰 숫자: [`reports/2026-09-11/write-replay-experiment.md`](reports/2026-09-11/write-replay-experiment.md)
 
+🔴 **`identityCounters` 를 무엇을 보고 채우는지는 DB 마다 다르다.** H2 2.x 는 시퀀스 목록에
+안 보여 주고 `INFORMATION_SCHEMA.COLUMNS.IDENTITY_BASE` 에 들고 있다(PostgreSQL 은 시퀀스,
+MySQL 은 `AUTO_INCREMENT` 속성). 🔴 **읽을 자리를 못 찾았으면 `null` 이다** — 「되돌렸다」가
+아니라 「안 봤다」다. 되돌릴 목록을 DB 에게 물어 전수로 센 방법과 숫자:
+🧭 [`reports/2026-09-11/db-restore-experiment.md`](reports/2026-09-11/db-restore-experiment.md)
+
 | 값 | 뜻 |
 | --- | --- |
 | `true` | 되돌렸다 |

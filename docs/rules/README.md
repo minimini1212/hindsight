@@ -25,6 +25,7 @@
 | [module-boundary-decision.md](module-boundary-decision.md) | 🔴 모듈은 「누구의 클래스패스」로만 나눈다. **13개에서 6개로 접은 이유** | 2026-09-10 |
 | [doc-layout-decision.md](doc-layout-decision.md) | 날짜 폴더 · 트러블슈팅은 **증상**으로 이름 짓기 · 링크 검사를 빌드에 건 것 | 2026-09-11 |
 | [replay-state-decision.md](replay-state-decision.md) | 🔴 재생의 정의에 **복원**을 넣었다. 「쓰기 요청은 채점 못 한다」를 뒤집은 자리 | 2026-09-11 |
+| [db-restore-decision.md](db-restore-decision.md) | 🔴 복원은 **스냅숏으로 되돌린다.** 롤백·가짜 DB 를 후보에서 탈락시킨 숫자 | 2026-09-11 |
 
 ## 아직 안 적은 것
 

@@ -65,6 +65,8 @@ cd C:\intellij_workspace\hindsight_project
 | SQL 세기가 두 배로 안 세이나 | ✅ 21 = 1+20 ([실측](sql-count-experiment.md)) |
 | `Filter` 로 잡은 걸로 재생이 되나 | ✅ 읽기 요청은 글자까지 동일 ([실측](http-capture-experiment.md)) |
 | 🔄 쓰기 요청도 채점할 수 있나 | ✅ **된다.** 되돌리면 글자까지 동일. 🔴 행만 되돌리면 재생이 «죽는다» ([실측](write-replay-experiment.md)) |
+| 🔄 되돌리는 «방법»은 무엇인가 | ✅ **스냅숏.** 롤백은 카운터를 안 되돌려 재생이 4·5·6 으로 갈리고, 가짜 DB 는 정석 수정에 **0 / 1** 로 답을 못 준다 ([실측](db-restore-experiment.md)) |
+| 되돌릴 목록이 몇 개인가 | ✅ **둘** — 행 · 자동 증가 카운터. DB 에게 물어 전수로 세었다(분모 35) |
 
 ### 🔴 다음에 손댈 것 — 순서까지 정해져 있다
 
@@ -72,18 +74,22 @@ cd C:\intellij_workspace\hindsight_project
 > 질문의 축이 틀렸었다. 쓰기라서 다른 게 아니라 **되돌리지 않아서** 달랐다. 등급은 넷 그대로다.
 > 🧭 [`write-replay-experiment.md`](write-replay-experiment.md) · [`replay-state-decision`](../../rules/replay-state-decision.md)
 
-**① 재생 전에 DB 를 기록 시점으로 «어떻게» 되돌릴지 정한다.** 위 결정이 남긴 숙제다.
-실험은 H2 메모리라 `truncate ... restart identity` 한 줄이면 됐지만 운영 DB 는 아니다.
-후보 셋: 기록된 질의에만 답하는 가짜 DB / 스냅숏을 컨테이너에 띄우기 / 트랜잭션을 열고 끝에 되돌리기.
+> ✅ ~~① 재생 전에 DB 를 «어떻게» 되돌릴지 정한다~~ — **2026-09-11 실측으로 정했다.**
+> **스냅숏을 떠 두고 그걸로 되돌린다.** 후보 셋을 갈라서 쟀고, 고른 이유는 속도가 아니라
+> **되돌릴 목록을 몰라도 된다**는 것이다 — 나열해서 원복하는 코드는 목록에서 한 항목을
+> 빠뜨리고, 그게 부분 복원이 된다.
+> 🧭 [`db-restore-experiment.md`](db-restore-experiment.md) · [`db-restore-decision`](../../rules/db-restore-decision.md)
 
-**② `demo-app` 을 진짜 서비스로 키운다.** 지금은 엔티티 둘짜리 최소 뼈대다.
+**① `demo-app` 을 진짜 서비스로 키운다.** 지금은 엔티티 둘짜리 최소 뼈대다.
 페이징·Redis·Docker Compose·OpenAPI 가 없다. 🔴 평가할 수 없는 포트폴리오는 0점이다.
 
-**③ v0 기록기를 만든다.** 실험용으로 만든 `SqlTap`·`HttpTap` 을 정식 코드로 옮긴다.
+**② v0 기록기를 만든다.** 실험용으로 만든 `SqlTap`·`HttpTap` 을 정식 코드로 옮긴다.
 ⬜ **만들기 전에 정할 것**: 따로 모듈인가, `demo-app` 안의 패키지인가
+🔴 **기록기가 남겨야 하는 것이 하나 늘었다** — 복원을 어디까지 했는지
+(`stateRestore`, [`DATA_CONTRACT`](../../DATA_CONTRACT.md) §7-3).
 
-⚠️ **①을 먼저 하는 이유**: 되돌리는 방법이 정해져야 ③이 무엇을 기록해야 하는지가 정해진다.
-순서를 바꾸면 두 번 만든다.
+⚠️ **①을 먼저 하는 이유**: 기록기는 관측 대상 앱의 모양을 따라간다. 엔티티 둘짜리 앱에 맞춰
+기록기를 만들면 페이징·Redis 가 들어올 때 다시 만든다.
 
 ### ⬜ 아직 안 정한 것
 
