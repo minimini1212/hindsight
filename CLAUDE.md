@@ -195,6 +195,12 @@ Set 2026-09-11. `dev` is the default branch on GitHub; `main` is the released li
 - 🔴 **Before asking for a commit, check that the work is actually on the remote.**
   `git branch -r --contains <sha>` answers it; a local branch that looks pushed is the
   quietest way to lose a day's work.
+- 🔴 **Merged branches are kept, not deleted — local and remote both.** The user's call,
+  2026-09-11. A branch name is a label on a piece of work that a commit range is not:
+  `feat/replay-state-restore` says what those two commits were *for*, and it stays
+  checkoutable long after the merge commit's subject line stops meaning anything.
+  Never delete a branch, never propose deleting one, and leave GitHub's
+  "automatically delete head branches" off.
 
 ---
 
