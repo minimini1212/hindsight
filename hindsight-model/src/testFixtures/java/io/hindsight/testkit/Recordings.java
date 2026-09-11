@@ -102,6 +102,9 @@ public final class Recordings {
                                 new ReplayInfo.Divergence.Side(null, "select o from Order o join fetch o.member", 1),
                                 "진단이 말한 방향과 일치한다"
                         ),
+                        // 행과 자동 증가 카운터는 되돌렸고, 캐시·외부는 «보았지만 못 되돌렸다».
+                        // 🔴 false 와 null 이 한 표본 안에 같이 있어야 왕복에서 둘이 안 섞이는지 보인다.
+                        new ReplayInfo.StateRestore(true, true, false, false),
                         T0.plusSeconds(30L * 24 * 3600),
                         "System.currentTimeMillis 는 v0 범위 밖"
                 ),
@@ -130,7 +133,9 @@ public final class Recordings {
                 List.of(),
                 null,
                 null,
-                new ReplayInfo(ReplayInfo.Grade.PARTIAL, null, null, null, null, null),
+                // 🔴 stateRestore 가 null 이다 — 「되돌리지 않았다」가 아니라 «안 봤다».
+                //    왕복 뒤에 이게 「전부 false」로 바뀌어 있으면 그게 결함이다.
+                new ReplayInfo(ReplayInfo.Grade.PARTIAL, null, null, null, null, null, null),
                 new Integrity(60, 60.0, 0L, 0L, 0L, 12_000L, 0L, false)
         );
     }

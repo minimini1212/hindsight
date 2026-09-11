@@ -137,8 +137,17 @@ class HttpCaptureExperimentTest {
                 .isEqualTo(original.responseBody());
     }
 
+    /**
+     * 🔴 <b>이 실험이 내린 결론은 실험 ⑦ 에서 뒤집혔다.</b>
+     * 여기서 응답이 다른 것은 「쓰기 요청이라서」가 아니라 <b>「DB 를 안 되돌리고 재생해서」</b>다.
+     * 행과 자동 증가 카운터까지 되돌리면 쓰기 요청도 글자까지 같은 응답이 나온다
+     * ({@link WriteReplayExperimentTest}).
+     *
+     * <p>이 실험은 <b>지우지 않고 둔다.</b> 「되돌리지 않으면 갈라진다」는 사실 자체는 그대로 맞고,
+     * 무엇을 근거로 틀린 결론까지 갔는지가 남아야 같은 길을 다시 안 걷는다.
+     */
     @Test
-    @DisplayName("🔴 실험 ⑥ 상태를 바꾸는 요청을 재생하면 — 같은 답이 안 나온다")
+    @DisplayName("🔴 실험 ⑥ 상태를 «안 되돌리고» 재생하면 — 같은 답이 안 나온다 (결론은 ⑦ 에서 뒤집힘)")
     void replayOfWriteRequestDiverges() throws Exception {
         String body = "{\"memberId\":" + memberId + ",\"product\":\"의자\"}";
 
@@ -169,7 +178,7 @@ class HttpCaptureExperimentTest {
         //    상태를 바꾸는 요청은 DB 가 이미 달라져 있어서 같은 답이 안 나온다.
         //    설계 §4-2 의 「앱 안에 쌓인 상태는 재현 안 된다」가 여기서 눈에 보인다.
         assertThat(replayedBody)
-                .as("🔴 쓰기 요청 재생은 원본과 다르다. 이걸 「고쳐졌다/안 고쳐졌다」로 읽으면 안 된다")
+                .as("🔴 «되돌리지 않고» 재생하면 원본과 다르다. 이걸 「안 고쳐졌다」로 읽으면 안 된다 — 실험 ⑦ 참조")
                 .isNotEqualTo(originalBody);
     }
 }
