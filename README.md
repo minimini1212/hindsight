@@ -69,6 +69,7 @@ Keploy · ReCrash(2008) · 테스트 카빙 · JFR · APM · Sentry Autofix. **�
 | 그날그날 무슨 일이 있었나 (리뷰·실측·트러블슈팅) | [docs/reports/](docs/reports/README.md) |
 | 지금 어디까지 왔나 | [TODOS.md](TODOS.md) |
 | 코드를 고칠 때 지킬 것 | [CLAUDE.md](CLAUDE.md) |
+| 🧭 **처음 이어받는다면** | [docs/reports/2026-09-11/handoff.md](docs/reports/2026-09-11/handoff.md) ← **읽는 순서가 여기 있습니다** |
 
 ## 구성
 

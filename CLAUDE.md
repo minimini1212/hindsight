@@ -42,6 +42,48 @@ goes stale, and a stale rule is worse than no rule: the next session reads it as
 - 🔴 **Do not put Korean prose inside `AskUserQuestion`.** In this environment that tool
   corrupts Korean text. Ask by writing numbered choices as prose in the reply body instead.
 
+## How this user wants you to work
+
+These are not preferences about this codebase — they are how the user works. They were
+learned across months on their other projects, and they do not travel with a new session,
+so they live here.
+
+### 🔴 Don't ask. Do all of it, then report.
+
+Two things are worth interrupting for: **"this would break something"** and **"this is the
+user's call, not a technical one."** Everything else — sequencing, naming, which file first —
+you decide and proceed. No progress updates mid-task either; finish, then report.
+
+⚠️ When you catch yourself ending a reply with *"shall I do A or B?"* on a question you
+could answer yourself: **pick one, say why in one line, and do it.**
+
+### 🔴 "Check it" means check all of it
+
+Never sample and extrapolate. If the user asks whether something holds, check every
+instance, not a representative few. And **you do not get to decide which findings matter** —
+report what you found and let them weigh it.
+
+### 🔴 Measure before calling something a defect
+
+Do not repeat a warning, a doc line, or a review finding as if it were an observed fact.
+State how you counted and what you counted, then give the number. When you quote a ratio,
+give the denominator.
+
+This project has been wrong about itself twice — the "SQL is counted twice" worry did not
+happen in v0, and the 13-module structure was defended with a reason that collapsed the
+moment it was followed one step further. **Both were found by measuring, not by arguing.**
+
+### Say it so someone new can follow it
+
+- Keep the technical term, add a short gloss in parentheses on first use in that reply.
+  Never swap the term out for a paraphrase — the user wants the real word.
+- **Never open a sentence with a file path or a section number.** Say what happened and why
+  it matters, then put the pointer in parentheses.
+- 🔴 **A section number is not an explanation.** `§7-2` tells the reader nothing until they
+  open it. Name what is in it, then point.
+- Never name a process you have not just described. Spell out what physically happens.
+- One concrete number beats one adjective.
+
 ---
 
 ## Sources of truth — read these, don't restate them here
@@ -53,6 +95,7 @@ goes stale, and a stale rule is worse than no rule: the next session reads it as
 | Recording file structure, field names, schema version, env vars | `docs/DATA_CONTRACT.md` **(read before writing code)** |
 | **Why is *this* shaped this way?** (decision history, reversals) | `docs/rules/<area>-decision.md` — index: `docs/rules/README.md` |
 | **Where is everything, and why does each module exist?** | `docs/00_CODE_WALKTHROUGH.md` **(start here; update it in the same commit as the code)** |
+| **Picking this up fresh — what to read, in what order** | `docs/reports/2026-09-11/handoff.md` |
 | Current state, deferred work, pending decisions | `TODOS.md` (top section) |
 | **What happened on a given day** (measurements, reviews, troubleshooting) | `docs/reports/<YYYY-MM-DD>/` — index: `docs/reports/README.md` |
 | **How do I get past this error again** | `docs/reports/<YYYY-MM-DD>/troubleshooting/<symptom>.md` |
@@ -80,8 +123,8 @@ exists because a monitoring tool that takes down the service it monitors is wors
   re-entry guard, writing a recording is itself recorded, forever.
 - **Never block the host's request thread.** Ring-buffer writes go through a queue that a
   separate thread drains. 🔴 **When the queue is full, drop and count — never block.**
-- **`hindsight-agent` compiles to Java 17**, not 25. It has to attach to apps in the wild.
-- Spring belongs in `hindsight-server` / `hindsight-brain` and nowhere near the agent.
+- **`hindsight-agent` compiles to Java 17**, not 21. It has to attach to apps in the wild.
+- Spring and every heavy library belong in `hindsight-core`, nowhere near the agent.
 
 Rationale and the incidents behind each line: `docs/rules/agent-safety-decision.md`.
 
@@ -89,7 +132,7 @@ Rationale and the incidents behind each line: `docs/rules/agent-safety-decision.
 
 This is the defect class the whole project exists to detect, so the tool must not commit it.
 
-- A replay grade of `PARTIAL` is **never** written as `DETERMINISTIC`. A recording whose
+- A replay grade of `PARTIAL` is **never** written as `VERIFIED_DETERMINISTIC`. A recording whose
   clock calls were not captured is *not* the same as one that made no clock calls.
 - A truncated body is marked `truncated: true`, not silently shortened.
 - Events dropped because the queue was full are **counted and reported**, never omitted.
@@ -139,7 +182,9 @@ propose one.
 
 ## Code and verification
 
-- **Java 25** everywhere except `hindsight-agent` and `hindsight-model` (**Java 17**).
+- **Java 21** everywhere except the modules that load inside the observed app —
+  `hindsight-model`, `hindsight-agent`, `hindsight-agent-boot` (**Java 17**).
+  Why not 25: `docs/rules/stack-decision.md`.
 - **Gradle multi-module.** Build with `./gradlew`. Never commit `build/`.
 - Prefer `record` for data, `sealed interface` for closed variant sets, pattern matching over
   instanceof chains. This project is partly a showcase of modern Java — use it, don't perform it.
