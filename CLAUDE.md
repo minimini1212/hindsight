@@ -205,8 +205,17 @@ Set 2026-09-11. `dev` is the default branch on GitHub; `main` is the released li
   names and docker tags, where Korean turns into percent-encoding nobody can read.
   Commit messages, docs and comments stay Korean.
 - Branch off `dev`, PR into `dev`. `git switch dev && git pull && git switch -c feat/…`
-- A branch is one topic. If a fix is unrelated to what the branch is named after, it belongs
-  on its own branch — that is what makes a revert possible later.
+- 🔴 **One branch = one reason you sat down to work** — not one kind of file. Whatever that
+  work produces rides along on it: the troubleshooting note the failure taught you, the index
+  row, the doc the decision changed, the test that proves it.
+  - **Two things still get their own branch**: a change to the discipline itself (this file),
+    because it has to be revertable without reverting the work; and a fix with **no causal
+    link** to what you are doing — someone else's bug you happened to notice.
+  - ⚠️ Set 2026-09-11 after measuring the opposite: reading "one topic" as "one kind of file"
+    produced **3 branches in one afternoon, two of them 1–2 files**, each with its own PR —
+    and two of those touched the same `docs/reports/README.md`, so splitting them *added* a
+    conflict instead of preventing one. Splitting earns its keep only when you would want to
+    revert the halves separately.
 - 🔴 **The branch does not exist for anyone else until it is pushed.** That is why
   finishing work now ends in a push (see the Git rules above). `git branch -r --contains <sha>`
   is how you confirm it landed — run it when a push errors out, not instead of pushing.
