@@ -44,6 +44,8 @@ docs/reports/
 ### [2026-09-15](2026-09-15/)
 | 무엇 | 결과 |
 | --- | --- |
+| 🔄 [**v0 기록기를 만들었다**](2026-09-15/v0-recorder.md) | 기록을 «만드는» 코드가 처음 생겼다. 검사 23→**67건**. 🎯 미뤄 뒀던 「모듈인가 패키지인가」를 **재서** 끝냈다(의존성 59→**59**, 늘어난 것 0). 🔴 **진짜 앱에 붙이자 따로 시험할 때는 안 보이던 결함 둘**이 나왔다 |
+| 🔧 [기록의 방아쇠가 전부 `ServletException` 으로 찍힌다](2026-09-15/troubleshooting/기록의-방아쇠가-전부-ServletException-으로-찍힌다.md) | 서블릿이 예외를 감싸서 준다. 🔴 그 결과 **두 번째 사고부터 기록이 아예 안 생긴다** |
 | 🔄 🔧 [PR 을 열려는데 `gh` 가 없다](2026-09-15/troubleshooting/PR을-열려는데-gh가-없다고-나온다.md) | 「Claude 가 PR 까지 연다」로 규율을 바꿔 봤다가 **같은 날 되돌렸다.** `gh` 로그인이 브라우저·코드 입력이라 비대화형으로 못 끝내서, 사람이 PR 을 여는 편이 단계가 적다. `gh` 2.100.0 은 깔아 뒀다 |
 
 ### [2026-09-11](2026-09-11/)
@@ -68,6 +70,7 @@ docs/reports/
 
 | 증상 | 언제 |
 | --- | --- |
+| [기록의 방아쇠가 전부 `ServletException` 으로 찍힌다 · 두 번째부터 기록이 안 생긴다](2026-09-15/troubleshooting/기록의-방아쇠가-전부-ServletException-으로-찍힌다.md) | 09-15 |
 | [PR 을 열려는데 `gh: command not found` · 깔아도 `not logged into any GitHub hosts`](2026-09-15/troubleshooting/PR을-열려는데-gh가-없다고-나온다.md) | 09-15 |
 | [테스트 출력의 한글이 `?? ?? ??` 로 깨진다](2026-09-11/troubleshooting/gradle-테스트-한글-깨짐.md) | 09-11 |
 | [`JAVA_HOME is set to an invalid directory` — 경로는 맞는데 그렇게 나온다](2026-09-11/troubleshooting/JAVA_HOME이-올바른-디렉터리가-아니라고-나온다.md) | 09-11 |

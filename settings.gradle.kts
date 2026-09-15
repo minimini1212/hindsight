@@ -24,6 +24,16 @@ rootProject.name = "hindsight"
 // ── 관측 대상 앱 «안»에서 도는 것 ──────────────────────────────────────────
 include("hindsight-model")     // 안팎이 공유하는 자료 구조. Java 17 · 의존성 0
 
+include("hindsight-recorder-simple")
+                               // v0 기록기. Filter + DataSource 감싸기. Java 21
+                               // 🔴 2026-09-15 에 「모듈로 둔다」로 정했다. 갈랐던 근거:
+                               //    demo-app 에 이미 Jackson 2.18.2 가 있고 core 가 쓰는 것과
+                               //    같은 버전이라, 이 의존으로 늘어나는 외부 jar 가 0 개다.
+                               //    「Spring AI 와 picocli 가 딸려 온다」는 오늘의 core 가 아니라
+                               //    미래의 core 이야기였고, 그 미래가 오는 순간은
+                               //    checkRecorderDependencies 가 잡는다.
+                               // 🧭 docs/rules/module-boundary-decision.md §6-2
+
 // ── 관측 대상 앱 «밖»에서 도는 것 ──────────────────────────────────────────
 include("hindsight-core")      // 읽기 · 재생 · 오라클 · 진단 · 채점 · 명령줄
                                // 안이 패키지로 나뉜다 (docs/00_CODE_WALKTHROUGH.md §3)
@@ -36,12 +46,6 @@ include("demo-app")            // 🔴 소품이 아니라 진짜 스프링 서�
 //
 //   v0  demo-app                   관측 대상. 🔴 진짜 스프링 서비스로 만든다
 //
-//   v0  v0 기록기 (Filter + DataSource 감싸기)
-//       ⬜ 🔴 «모듈일지 demo-app 안의 패키지일지 아직 안 정했다. 만들 때 정한다.»
-//          한때 「demo-app 안으로 들어가니 따로여야 한다」고 적었는데 그 이유가 성립을 안 한다 —
-//          기록을 저장하려면 core 의 코덱이 필요하고, 그러면 모듈을 나눠도 Spring AI 와
-//          picocli 가 demo-app 으로 딸려 간다. 남는 이유는 취향뿐이다.
-//          🧭 docs/rules/module-boundary-decision.md §6-2
 //   v1  hindsight-agent-boot       부트스트랩 클래스로더에 올라간다. Java 17 · 의존성 0
 //                                  🔴 «다른 클래스로더»라 같은 jar 에 못 넣는다
 //   v1  hindsight-agent            premain · ByteBuddy(셰이딩) · 링 버퍼. Java 17

@@ -18,5 +18,13 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("com.h2database:h2")
 
+    // 🔴 v0 기록기. 이 앱 «안»에서 돈다.
+    //
+    // 2026-09-15 측정: 이 한 줄로 늘어나는 외부 jar 는 «0개»다. 기록기가 딸고 오는 것은
+    // Jackson 2.18.2 뿐인데 spring-boot-starter-web 이 이미 같은 버전을 들고 있다.
+    // 「Spring AI 와 picocli 가 딸려 온다」던 걱정은 오늘의 core 가 아니라 미래의 core 다.
+    // 그 미래가 오는 순간은 :hindsight-recorder-simple:checkRecorderDependencies 가 잡는다.
+    implementation(project(":hindsight-recorder-simple"))
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
