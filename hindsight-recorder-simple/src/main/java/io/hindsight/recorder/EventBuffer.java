@@ -206,6 +206,13 @@ public final class EventBuffer {
         }
     }
 
+    /** 지금 링에 든 이벤트 수. 「어림한 바이트」와 짝지어 봐야 어림이 맞는지 알 수 있다. */
+    public int bufferedEventCount() {
+        synchronized (ringLock) {
+            return ring.size();
+        }
+    }
+
     /** 테스트와 앱 종료용. 도는 중에는 부르지 않는다. */
     public void close() {
         running = false;
