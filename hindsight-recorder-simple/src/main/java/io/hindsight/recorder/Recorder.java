@@ -267,6 +267,31 @@ public final class Recorder {
         return buffer.awaitDrained(timeout);
     }
 
+    // ── 재생하는 동안 「무엇이 나갔나」를 보는 자리 ─────────────────────────
+    //
+    // 🔴 재생 중에도 «같은» 계측을 켜 두고, 재생이 만든 경계 호출을 기록과 대조한다.
+    //    계측 목록으로 등급을 미리 매기면 「DETERMINISTIC 이라고 적힌 기록이 실제로는
+    //    갈라지는」 일이 생긴다 — 캐시가 따뜻했는지, 정적 변수에 뭐가 쌓였는지는
+    //    목록으로 알 수 없기 때문이다. 그래서 «관찰»로 바꾼다.
+
+    /** 지금까지 몇 번째 이벤트까지 왔나. 여기서부터 본다는 표시다. */
+    public long currentSeq() {
+        return seq.get();
+    }
+
+    /**
+     * 표시한 자리 «뒤»에 들어온 이벤트. 재생이 무엇을 냈는지 보는 데 쓴다.
+     *
+     * <p>🔴 큐에 남은 것을 먼저 링까지 밀어 넣는다. 안 그러면 방금 나간 질의가 빠지고,
+     * 그러면 「재생이 질의를 덜 냈다」는 <b>틀린 관찰</b>이 나온다.
+     */
+    public List<Event> eventsSince(long mark, java.time.Duration wait) {
+        buffer.awaitDrained(wait);
+        return buffer.snapshot().stream()
+                .filter(event -> event.seq() > mark)
+                .toList();
+    }
+
     long bufferBytesForTest() {
         return buffer.bufferBytes();
     }

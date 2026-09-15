@@ -140,9 +140,18 @@ public sealed interface Oracle {
      */
     record QueryRepeatNotWorse() implements Oracle {
 
+        /**
+         * 이 문턱 아래로는 「반복」이라고 부르지 않는다.
+         *
+         * <p>같은 질의가 두 번 나가는 것은 흔하고 정상일 수 있다. 기록된 최대 반복이 이 값
+         * 미만이면 <b>애초에 반복 결함이 없는 기록</b>이므로, 이 오라클은 판정하지 않는다 —
+         * 🔴 그때 억지로 판정하면 「1번 >= 1번 이므로 실패」 같은 헛말이 나온다.
+         */
+        private static final int 반복이라고_부를_최소_횟수 = 2;
+
         @Override
         public String name() {
-            return "같은 모양의 질의가 기록보다 더 반복되지 않는다";
+            return "같은 모양의 질의가 기록만큼 반복되지 않는다";
         }
 
         @Override
@@ -150,40 +159,41 @@ public sealed interface Oracle {
             if (observation.executedSql() == null) {
                 return OracleVerdict.notJudged(name(), "재생이 낸 질의를 «안 봤다»");
             }
-            int recordedWorst = worstRecordedRepeat(recording);
+            List<Event.Sql> ofRequest = queriesOfRequest(recording);
+            if (ofRequest == null) {
+                return OracleVerdict.notJudged(name(),
+                        "기록에서 «이 요청이 낸» 질의를 가려낼 수 없다. 상관 식별자가 없다");
+            }
+            int recordedWorst = worstRepeat(ofRequest);
             if (recordedWorst < 0) {
                 return OracleVerdict.notJudged(name(), "기록에 질의 모양이 «없다». 견줄 기준이 없다");
+            }
+            if (recordedWorst < 반복이라고_부를_최소_횟수) {
+                return OracleVerdict.notJudged(name(),
+                        "기록의 최대 반복이 " + recordedWorst + "번이라 애초에 반복 결함이 «없다». 판정할 것이 없다");
             }
 
             Map<String, Integer> replayed = countByShape(observation.executedSql());
             int replayedWorst = replayed.values().stream().mapToInt(Integer::intValue).max().orElse(0);
 
-            if (replayedWorst > recordedWorst) {
+            // 🔴 «이상»이면 실패다. «초과»로 두면 기록 그대로인 실행이 통과해 버리고,
+            //    그러면 「패치 전에 정말 실패했나」가 영영 참이 될 수 없다 — 채점 자체가 성립을 안 한다.
+            if (replayedWorst >= recordedWorst) {
                 String worstShape = replayed.entrySet().stream()
                         .max(Map.Entry.comparingByValue())
                         .map(Map.Entry::getKey).orElse("?");
                 return OracleVerdict.fail(name(),
-                        "한 모양이 " + replayedWorst + "번 반복된다. 기록의 최대는 " + recordedWorst + "번이었다: " + worstShape);
+                        "한 모양이 " + replayedWorst + "번 반복된다. 기록도 " + recordedWorst + "번이었다 — 그대로거나 더 나쁘다: " + worstShape);
             }
             return OracleVerdict.pass(name(),
-                    "가장 많이 반복된 모양이 " + replayedWorst + "번. 기록의 " + recordedWorst + "번 이하다");
+                    "가장 많이 반복된 모양이 " + replayedWorst + "번. 기록의 " + recordedWorst + "번보다 줄었다");
         }
 
-        /** 기록에서 «한 모양»이 최대 몇 번 나왔나. 요약층이 없으면 전문층에서 센다. */
-        private static int worstRecordedRepeat(Recording recording) {
-            Summary summary = recording.summary();
-            if (summary != null && summary.sqlShapes() != null && !summary.sqlShapes().isEmpty()) {
-                return summary.sqlShapes().stream()
-                        .mapToInt(Summary.SqlShape::count).max().orElse(-1);
-            }
-            if (recording.events() == null) {
-                return -1;
-            }
+        /** 이 요청이 낸 질의 중 «한 모양»이 최대 몇 번 나왔나. */
+        private static int worstRepeat(List<Event.Sql> queries) {
             Map<String, Integer> counts = new LinkedHashMap<>();
-            for (Event event : recording.events()) {
-                if (event instanceof Event.Sql sql) {
-                    counts.merge(SqlShapes.of(sql.sql()).hash(), 1, Integer::sum);
-                }
+            for (Event.Sql sql : queries) {
+                counts.merge(SqlShapes.of(sql.sql()).hash(), 1, Integer::sum);
             }
             return counts.isEmpty() ? -1 : counts.values().stream().mapToInt(Integer::intValue).max().orElse(-1);
         }
@@ -198,6 +208,39 @@ public sealed interface Oracle {
     }
 
     // ────────────────────────────────────────────────────────────────────────
+
+    /**
+     * 🔴 <b>이 요청이 «직접» 낸 질의만</b> 골라낸다. 못 가려내면 {@code null}.
+     *
+     * <h2>왜 전부를 세면 안 되나 — 2026-09-15 실측으로 잡았다</h2>
+     * 기록에는 <b>그 요청과 무관한 질의가 섞여 있다.</b> 앱이 뜨면서 만든 스키마, 다른 요청이
+     * 낸 질의, 배치 작업이 낸 질의가 같은 창 안에 들어온다. 실제로 세어 보니
+     * <b>이벤트 16건 중 14건이 요청 밖의 것</b>이었다(상관 식별자가 {@code null}).
+     *
+     * <p>그걸 같이 세면 문턱이 엉뚱하게 높아진다. 실측에서 기록의 「최대 반복」이
+     * 요청과 상관없는 <b>seed 의 {@code insert} 5번</b>으로 잡혔고, 재생의 1번이 그보다
+     * 작으니 <b>N+1 을 안 고쳤는데도 통과</b>가 나왔다.
+     * 🔴 <b>채점기가 아무것도 안 보고 초록불을 켠 것이다.</b>
+     *
+     * <h2>🔴 요약층을 쓰면 안 되는 이유이기도 하다</h2>
+     * 데이터 계약이 두 층을 가르면서 못 박아 뒀다 — 전문층은 「재생에 쓸 수 있는 유일한 층」,
+     * 요약층은 「재생엔 못 쓰고 사람이 원인을 찾는 데 쓴다」. 요약층은 60초 창이라
+     * <b>남의 질의가 들어 있다.</b> 처음 구현이 요약층을 기준으로 삼았고, 그게 위 결함이었다.
+     *
+     * <p>가려낼 수 없으면 {@code null} 을 돌려준다 — 그러면 오라클이 「판정 못 함」이 된다.
+     * 🔴 <b>가려낼 수 없는데 전부 세는 것보다, 판정을 안 하는 쪽이 옳다.</b>
+     */
+    static List<Event.Sql> queriesOfRequest(Recording recording) {
+        Event.HttpIn entryPoint = entryPointOf(recording);
+        if (entryPoint == null || entryPoint.corrId() == null || recording.events() == null) {
+            return null;
+        }
+        return recording.events().stream()
+                .filter(Event.Sql.class::isInstance)
+                .map(Event.Sql.class::cast)
+                .filter(sql -> entryPoint.corrId().equals(sql.corrId()))
+                .toList();
+    }
 
     /** 기록의 진입점이 된 요청. 없으면 {@code null}. */
     static Event.HttpIn entryPointOf(Recording recording) {

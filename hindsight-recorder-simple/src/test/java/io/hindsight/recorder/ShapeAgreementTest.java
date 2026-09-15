@@ -2,6 +2,7 @@ package io.hindsight.recorder;
 
 import io.hindsight.core.replay.ReplayObservation;
 import io.hindsight.core.store.RecordingCodec;
+import io.hindsight.model.Event;
 import io.hindsight.model.Recording;
 import io.hindsight.model.ReplayInfo;
 import io.hindsight.model.SqlShapes;
@@ -15,8 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,18 +61,33 @@ class ShapeAgreementTest {
         }
     }
 
-    /** 앱이 N+1 을 일으켰다고 치고, 진짜 기록 파일을 하나 만든다. */
+    /**
+     * 앱이 N+1 을 일으켰다고 치고, 진짜 기록 파일을 하나 만든다.
+     *
+     * <p>🔴 <b>요청 안에서</b> 질의를 낸다({@link Correlation#begin()}). 밖에서 내면 상관 식별자가
+     * 없어서, 나중에 「어느 질의가 이 요청 것인가」를 가려낼 수 없다 — 그러면 채점이
+     * 「판정 못 함」으로 빠지고 이 시험이 보려던 것을 못 본다.
+     */
     private Recording n플러스원을_기록한다() {
         recorder = new Recorder(RecorderConfig.builder()
                 .storeDir(storeDir).appName("shape-agreement").build());
 
-        recorder.recordSql("select * from orders", List.of(), null, 5);
-        for (int i = 0; i < 20; i++) {
-            recorder.recordSql("select * from member where id = " + i, List.of(), null, 2);
+        String corrId = Correlation.begin();
+        try {
+            recorder.recordSql("select * from orders", List.of(), null, 5);
+            for (int i = 0; i < 20; i++) {
+                recorder.recordSql("select * from member where id = " + i, List.of(), null, 2);
+            }
+            recorder.recordHttp(new Event.HttpIn(
+                    recorder.nextSeq(), corrId, Instant.now(), Thread.currentThread().getName(), 3400L,
+                    "GET", "/api/orders", null, null, Map.of(),
+                    null, false, 0, 200, "{\"orders\":[]}", false));
+            Path file = recorder.capture(Trigger.Kind.LATENCY, "GET /api/orders", null, 3400L, null)
+                    .orElseThrow();
+            return new RecordingCodec().read(file);
+        } finally {
+            Correlation.clear();
         }
-        Path file = recorder.capture(Trigger.Kind.LATENCY, "GET /api/orders", null, 3400L, null)
-                .orElseThrow();
-        return new RecordingCodec().read(file);
     }
 
     @Test

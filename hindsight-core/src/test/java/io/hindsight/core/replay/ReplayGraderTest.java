@@ -66,6 +66,17 @@ class ReplayGraderTest {
         return 기록(integrity, events, summary);
     }
 
+    /**
+     * 🔴 «고쳐진» 재생 — 모양은 그대로인데 반복이 사라졌다(캐시를 붙였다고 치자).
+     *
+     * <p>모양이 그대로라 갈라짐이 아니고, 반복이 줄었으므로 반복 오라클이 통과한다.
+     * 조인으로 고치면 «새 모양»이 생겨서 DIVERGED 가 되는데, 그건 따로 검사한다.
+     */
+    private static List<String> 고쳐진_질의() {
+        return List.of("select * from orders", "select * from member where id = 1");
+    }
+
+    /** 기록과 «똑같은» 재생 — 즉 아무것도 안 고친 것. */
     private static List<String> 기록과_같은_질의() {
         List<String> sqls = new ArrayList<>();
         sqls.add("select * from orders");
@@ -292,10 +303,24 @@ class ReplayGraderTest {
             ReplayResult result = ReplayResult.of(n플러스원_기록(구멍없는_기록()),
                     ReplayObservation.builder()
                             .responseStatus(200).responseBody("{\"orders\":[]}")
-                            .executedSql(기록과_같은_질의()).build(),
+                            .executedSql(고쳐진_질의()).build(),
                     충분히_되돌림, true);
 
             assertThat(result.allowsAutoPullRequest()).isTrue();
+        }
+
+        @Test
+        @DisplayName("🔴 아무것도 안 고친 재생은 자동 PR 이 «안» 된다 — 반복이 그대로라서")
+        void 안_고친_재생은_자동_PR_이_안_된다() {
+            ReplayResult result = ReplayResult.of(n플러스원_기록(구멍없는_기록()),
+                    ReplayObservation.builder()
+                            .responseStatus(200).responseBody("{\"orders\":[]}")
+                            .executedSql(기록과_같은_질의()).build(),
+                    충분히_되돌림, true);
+
+            assertThat(result.allowsAutoPullRequest()).isFalse();
+            assertThat(result.verdicts())
+                    .anyMatch(v -> v.outcome() == OracleVerdict.Outcome.FAIL);
         }
 
         @Test
