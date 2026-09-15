@@ -24,6 +24,21 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final MemberRepository memberRepository;
 
+    /**
+     * 🔴 N+1 을 고친 길로 갈 것인가. 기본은 «안 고친» 길이다 — 이 앱은 버그를 «들고 있는» 것이
+     * 제 일이고, 고친 길은 채점 고리를 끝까지 돌려 보려고 둔 것이다.
+     */
+    @org.springframework.beans.factory.annotation.Value("${demo.n-plus-one-fixed:false}")
+    private boolean nPlusOneFixed;
+
+    /**
+     * 시험이 「패치」를 흉내 내는 자리. 🔴 <b>운영 코드가 부르는 길은 아니다</b> —
+     * 진짜 도구에서는 LLM 이 «소스를 고쳐» 이 자리를 만든다.
+     */
+    public void setNPlusOneFixedForTest(boolean fixed) {
+        this.nPlusOneFixed = fixed;
+    }
+
     public OrderService(OrderRepository orderRepository, MemberRepository memberRepository) {
         this.orderRepository = orderRepository;
         this.memberRepository = memberRepository;
@@ -52,11 +67,20 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public List<OrderView> findAll() {
-        return orderRepository.findAll().stream()          // ← SQL 1번
+        // 🔴 설정 한 줄로 「버그가 있는 길」과 「고친 길」을 오간다.
+        //    이게 있는 이유는 v0 의 채점 고리를 «끝까지» 돌려 보기 위해서다 —
+        //    「패치 전에 실패하고 패치 후에 통과한다」를 확인하려면 «패치 후»의 코드가 있어야 한다.
+        //    ⚠️ 진짜 도구에서는 LLM 이 그 코드를 써 넣는다. 여기서는 사람이 미리 써 둔 것이라,
+        //       이건 「고리가 도는가」를 보는 장치이지 「LLM 이 고칠 수 있는가」의 증거가 아니다.
+        List<Order> orders = nPlusOneFixed
+                ? orderRepository.findAllWithMember()      // 조인 1번으로 끝
+                : orderRepository.findAll();               // ← SQL 1번, 그리고 아래에서 N번 더
+
+        return orders.stream()
                 .map(o -> new OrderView(
                         o.getId(),
                         o.getProduct(),
-                        o.getMember().getName()))          // ← 주문 건수만큼 SQL 이 더 나간다
+                        o.getMember().getName()))          // 고치기 «전»에는 주문 건수만큼 SQL 이 더 나간다
                 .toList();
     }
 }
