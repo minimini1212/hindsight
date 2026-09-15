@@ -1,5 +1,6 @@
 package io.hindsight.recorder;
 
+import io.hindsight.model.SqlShapes;
 import io.hindsight.model.Summary;
 
 import java.time.Instant;
@@ -139,14 +140,15 @@ public final class SummaryWindow {
      */
     private Fingerprint fingerprintOf(String sql) {
         if (sql == null) {
-            return new Fingerprint("(알 수 없음)", SqlFingerprint.hash("(알 수 없음)"));
+            SqlShapes.Shape unknown = SqlShapes.of(null);
+            return new Fingerprint(unknown.normalized(), unknown.hash());
         }
         Fingerprint cached = 모양캐시.get(sql);
         if (cached != null) {
             return cached;
         }
-        String normalized = normalize(sql);
-        Fingerprint made = new Fingerprint(normalized, SqlFingerprint.hash(normalized));
+        SqlShapes.Shape shape = SqlShapes.of(sql);
+        Fingerprint made = new Fingerprint(shape.normalized(), shape.hash());
         if (모양캐시.size() < 모양_캐시_상한) {
             모양캐시.putIfAbsent(sql, made);
         }
@@ -161,20 +163,12 @@ public final class SummaryWindow {
     /**
      * 값이 다른 같은 질의를 한 모양으로 접는다.
      *
-     * <p>🔴 값을 지우는 것이 요점이다. {@code where id = 7} 과 {@code where id = 8} 은
-     * <b>같은 코드가 낸 같은 질의</b>이고, 이걸 다른 것으로 세면 N+1 이 「서로 다른 질의 200개」로
-     * 보여서 안 잡힌다. 실제로 2026-09-11 실측에서 「총 횟수」보다 「모양별 반복」이
-     * 훨씬 나은 신호라는 것이 나왔다.
+     * <p>🔴 계산 자체는 {@link SqlShapes} 에 있다. 여기서 다시 구현하면 안 된다 —
+     * <b>기록하는 쪽과 재생하는 쪽이 조금이라도 다르게 계산하면 대조가 영영 안 맞고,
+     * 그 고장은 오류 없이 조용하다.</b> 이 메서드는 그 자리를 가리키기만 한다.
      */
     static String normalize(String sql) {
-        if (sql == null) {
-            return "(알 수 없음)";
-        }
-        return sql
-                .replaceAll("'[^']*'", "?")      // 문자열 값
-                .replaceAll("\\b\\d+\\b", "?")   // 숫자 값
-                .replaceAll("\\s+", " ")
-                .trim();
+        return SqlShapes.normalize(sql);
     }
 
     private static final class Shape {
