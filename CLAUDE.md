@@ -174,19 +174,49 @@ propose one.
 ### Git
 
 - **Finishing a unit of work on a `<type>/<slug>` branch means: stage named paths, commit,
-  and `git push -u origin <that branch>`.** Changed by the user 2026-09-11, replacing
-  "the user pushes, Claude never pushes" — a local commit that looks pushed is the quietest
-  way to lose a day's work, and checking `git branch -r --contains <sha>` after the fact
-  only catches it if someone remembers to look.
+  `git push -u origin <that branch>`, and write the PR title and body.** Push was added by
+  the user 2026-09-11, replacing "the user pushes, Claude never pushes" — a local commit that
+  looks pushed is the quietest way to lose a day's work, and checking
+  `git branch -r --contains <sha>` after the fact only catches it if someone remembers to look.
+  **Writing the PR text was added 2026-09-15**: the user was having to ask for it every time,
+  and a branch whose reasoning only exists in this chat loses that reasoning the moment the
+  chat scrolls.
   - 🔴 **Only the branch that was just worked on.** Never `git push` `dev` or `main`,
     never `--force` / `--force-with-lease`, never `push --delete`. Rewriting or deleting
     what is already on the remote is the one thing a push must not do.
   - 🔴 **Never `git add .`** — stage named paths, every time. A push makes a stray
     staged file everyone else's problem.
-  - **Opening the PR stays the user's action.** Push puts the work somewhere safe;
-    merging into `dev` is a decision, and decisions are theirs.
+  - **Opening the PR stays the user's action.** Push puts the work somewhere safe and the
+    text makes it reviewable; merging into `dev` is a decision, and decisions are theirs.
   - Report the branch name and the pushed SHA when the work is done, so there is nothing
     to verify by hand.
+
+##### 🔴 The PR text is written without being asked, and it is written to be pasted
+
+- 🔴 **Produce it in the same reply as the push.** Do not wait to be asked, and do not offer
+  to write it — it is part of finishing, like the build passing.
+- 🔴 **Put the title and the body in fenced code blocks** so they can be copied straight into
+  GitHub. A body rendered as prose has to be un-rendered by hand first. The body contains
+  its own fences (diagrams, numbers), so wrap it in a longer fence.
+- **Title = the commit subject.** One branch is one commit is one topic; three different
+  summaries of the same thing is three things to keep in sync.
+- Korean, like every other repo artifact. Only the branch name stays English.
+- End the body with the PR attribution line the session was given.
+- **A stacked branch says so in the first line** — which branch it sits on and that merging
+  the lower one first keeps the diff to its own work.
+
+A PR body says what the work *proposes*, and a proposal that claims more than it proved is
+the same defect this project exists to catch. So it always carries these three:
+
+| | |
+| --- | --- |
+| **무엇을 바꿨나** | the change, and the reason it is shaped that way |
+| **무엇을 쟀나** | the numbers, with how they were counted |
+| 🔴 **무엇이 아직 확인 안 됐나** | what was *not* measured, what was skipped, what is assumed |
+
+🔴 **The third row is never empty.** If nothing is unverified, say what would have to be true
+for that to hold — "이 판정이 진짜 재생에서 맞는지는 아직 안 봤다" is information; silence
+reads as "everything was checked."
 - **Commit only when the work is actually finished**, not at every edit — one commit is one
   topic, the same topic the branch is named after. `./gradlew build` passes first
   (that run includes `checkDocLinks` and `checkAgentDependencies`).
