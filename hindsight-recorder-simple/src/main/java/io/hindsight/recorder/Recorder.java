@@ -256,6 +256,29 @@ public final class Recorder {
         buffer.close();
     }
 
+    // ── 재는 데만 쓰는 구멍 ─────────────────────────────────────────────────
+    //
+    // 🔴 아래 넷은 «패키지 안에서만» 보인다. 밖으로 열지 않는 이유는, 버퍼의 속사정이
+    //    공개 API 가 되면 나중에 버퍼를 바꿀 때 쓰는 쪽이 같이 깨지기 때문이다.
+    //    그렇다고 안 열면 「기록기를 붙이면 얼마나 드나」를 잴 방법이 없고,
+    //    잴 수 없는 것은 결국 «안 재게 된다».
+
+    boolean awaitDrainedForTest(java.time.Duration timeout) {
+        return buffer.awaitDrained(timeout);
+    }
+
+    long bufferBytesForTest() {
+        return buffer.bufferBytes();
+    }
+
+    int bufferedEventCountForTest() {
+        return buffer.bufferedEventCount();
+    }
+
+    long droppedEventsForTest() {
+        return buffer.droppedEvents();
+    }
+
     private static String newId() {
         return Long.toHexString(java.util.concurrent.ThreadLocalRandom.current().nextLong() & 0xFFFFFFFFL);
     }

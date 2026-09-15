@@ -44,8 +44,9 @@ public final class SummaryWindow {
 
     /** SQL 한 건. 본문은 안 받는다 — 받으면 이 층이 가벼운 이유가 사라진다. */
     public void addSql(String sql, long tookMs, long nowNanos) {
-        String normalized = normalize(sql);
-        String hash = SqlFingerprint.hash(normalized);
+        Fingerprint fingerprint = fingerprintOf(sql);
+        String normalized = fingerprint.normalized();
+        String hash = fingerprint.hash();
         synchronized (lock) {
             expire(nowNanos);
             Shape shape = shapes.computeIfAbsent(hash, h -> new Shape(normalized));
@@ -98,6 +99,63 @@ public final class SummaryWindow {
             lines.pollFirst();
         }
         shapes.entrySet().removeIf(e -> nowNanos - e.getValue().lastSeenNanos > windowNanos);
+    }
+
+    // ── 모양 만들기와 그 값을 재쓰는 자리 ───────────────────────────────────
+
+    /** 같은 SQL 문자열에 대해 두 번 계산하지 않으려고 들고 있는 것. */
+    private record Fingerprint(String normalized, String hash) {}
+
+    /**
+     * 캐시 상한.
+     *
+     * <p>🔴 <b>상한이 없으면 이 캐시가 앱을 죽인다.</b> 값을 문자열로 이어 붙여 SQL 을 만드는
+     * 앱이 있다 — {@code "... where id = " + id} — 그러면 <b>서로 다른 SQL 문자열이 무한히</b>
+     * 생기고, 캐시가 그걸 전부 들고 있게 된다. 관측 도구가 관측 대상의 힙을 먹어 치우는
+     * 모양이고, 이 프로젝트가 절대 하면 안 되는 일이다.
+     *
+     * <p>1,000 인 이유: 파라미터를 제대로 쓰는 앱의 서로 다른 질의는 보통 수십~수백 개다.
+     * 1,000 을 넘긴다는 것은 대개 <b>값이 SQL 문에 박혀 있다</b>는 신호이고, 그때는
+     * 캐시가 도움이 안 되므로 그냥 «캐시를 안 쓴다».
+     */
+    private static final int 모양_캐시_상한 = 1000;
+
+    private final java.util.concurrent.ConcurrentHashMap<String, Fingerprint> 모양캐시 =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * SQL 문자열 하나의 «모양»과 지문. 같은 문자열이면 계산을 건너뛴다.
+     *
+     * <h2>🔴 왜 캐시가 필요한가 — 재서 알았다</h2>
+     * 2026-09-15 측정: SQL 이벤트 하나를 기록하는 데 <b>5.42µs</b> 가 들었는데
+     * (설계 목표는 2µs), 그중 <b>3.34µs</b> 가 이 계산이었다. 정규식 세 번이 2.42µs,
+     * SHA-256 이 0.22µs 다. 즉 <b>고칠 자리는 링 버퍼가 아니라 여기</b>였다.
+     *
+     * <p>그리고 이 도구가 겨누는 대표 버그인 N+1 은 <b>같은 SQL 이 수백 번 반복</b>되는 모양이다 —
+     * 캐시가 가장 잘 듣는 자리가 하필 가장 중요한 자리다.
+     *
+     * <p>⚠️ 상한을 넘으면 캐시에 «넣지 않고» 계산만 한다. 비우지 않는 이유: 비우면
+     * 상한 근처에서 채우고-비우고를 반복하며 <b>캐시가 없을 때보다 느려진다.</b>
+     */
+    private Fingerprint fingerprintOf(String sql) {
+        if (sql == null) {
+            return new Fingerprint("(알 수 없음)", SqlFingerprint.hash("(알 수 없음)"));
+        }
+        Fingerprint cached = 모양캐시.get(sql);
+        if (cached != null) {
+            return cached;
+        }
+        String normalized = normalize(sql);
+        Fingerprint made = new Fingerprint(normalized, SqlFingerprint.hash(normalized));
+        if (모양캐시.size() < 모양_캐시_상한) {
+            모양캐시.putIfAbsent(sql, made);
+        }
+        return made;
+    }
+
+    /** 캐시에 든 서로 다른 SQL 문자열 수. 상한에 닿았다면 「값이 SQL 에 박혀 있다」는 신호다. */
+    int cachedShapeCount() {
+        return 모양캐시.size();
     }
 
     /**

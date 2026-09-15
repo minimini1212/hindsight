@@ -35,6 +35,12 @@ import javax.sql.DataSource;
  * </pre>
  */
 @Configuration
+// 🔴 끌 수 있게 해 둔다. 이유는 편의가 아니라 «측정»이다 —
+//    「기록기를 붙이면 얼마나 느려지나」는 붙인 쪽과 뗀 쪽을 같은 기계에서 재야 답이 나오고,
+//    끌 수 없으면 그 질문에 영영 답을 못 한다. 설계 §10 이 「붙임/뗌을 비교하라」고 한 이유다.
+//    기본값은 «켜짐»이다 — 끄는 것이 기본이면 아무도 안 켠다.
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        name = "hindsight.recorder.enabled", havingValue = "true", matchIfMissing = true)
 public class RecorderConfiguration {
 
     /**

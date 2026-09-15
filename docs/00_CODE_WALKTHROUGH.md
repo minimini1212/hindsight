@@ -8,8 +8,8 @@
 > | | 지금 |
 > | --- | --- |
 > | 모듈 | **4개** 있다 (전체 계획은 **6개** — §2) |
-> | 소스 | 자바 **49개** (model 9 · core 6 · recorder-simple 17 · demo-app 17) |
-> | 검사 | **67건** 통과 (core 20 · recorder-simple 28 · demo-app 19) |
+> | 소스 | 자바 **54개** (model 9 · core 6 · recorder-simple 21 · demo-app 18) |
+> | 검사 | **80건** 통과 (core 20 · recorder-simple 39 · demo-app 21) |
 > | 빌드 | Gradle 9.3 · 이중 툴체인 **실측 확인** — model major=61(Java 17), core major=65(Java 21) |
 > | 빌드가 막는 것 | 문서 링크 · 에이전트 의존성 · 🔄 **기록기 의존성**(새로 생김) |
 >
@@ -226,7 +226,7 @@ import 해야 한다."*
 
 ---
 
-## §3. 지금 있는 파일 49개
+## §3. 지금 있는 파일 54개
 
 ### `hindsight-model/` — 기록의 모양 (자바 8개)
 
@@ -332,6 +332,18 @@ write(recording)
 | `http/RecordingFilter.java` | 방아쇠 둘(예외·지연). 🔴 **앱이 던진 예외는 그대로 통과시킨다** |
 | `jdbc/RecordingDataSource.java` | 동적 프록시로 SQL 을 잡는다. 🔴 예외 종류를 안 바꾼다 |
 
+**재는 코드 넷**이 검사 폴더에 따로 있다 — `OverheadHarness`(덥히기·분위수·결과 쓰기를
+챙기는 자), `OverheadTest`(실험 ⑩), `SqlShapeCostTest`(실험 ⑩-⑤), `SummaryWindowTest`.
+🔴 **재는 코드가 먼저 있어야 「느리다」가 의견이 아니라 숫자가 된다.**
+
+#### 🔄 `SummaryWindow` 의 모양 캐시 — 재서 붙인 것
+
+SQL 이벤트 하나가 **5.42µs** 였는데(목표 2µs), 그중 **3.34µs** 가 질의를 모양으로 접는
+계산이었다. 같은 SQL 문자열이면 그 결과를 재쓰게 해서 **0.46µs** 로 줄였다.
+🔴 **상한(1,000개)이 없으면 이 캐시가 남의 앱 힙을 먹는다** — 값을 문자열로 이어 붙여
+SQL 을 만드는 앱에서는 서로 다른 문자열이 무한히 생긴다.
+🧭 [`reports/2026-09-15/recorder-overhead.md`](reports/2026-09-15/recorder-overhead.md)
+
 #### 🔴 `Correlation` — 스레드 번호를 쓰면 왜 안 되나
 
 요청이 동시에 열 개 들어오면 SQL 도 열 갈래로 섞여 나간다. 가장 쉬운 방법은
@@ -429,8 +441,11 @@ Jackson 에게 종류를 알려주는 흔한 방법은 클래스 이름을 적�
 ⚠️ **이 파일이 있다는 사실 자체가 v0 의 한계다** — v1 에이전트는 `-javaagent` 한 줄로
 붙으므로 이 파일이 사라진다.
 
-🔄 **테스트가 하나 늘었다.** `hindsight/RecorderEndToEndTest.java` 가 실험 ⑨ 다 —
+🔄 **테스트가 둘 늘었다.** `hindsight/RecorderEndToEndTest.java` 가 실험 ⑨ 다 —
 기록기를 «진짜 앱에 붙인 채로» 요청을 보내고, 앱이 멀쩡한지와 파일이 생기는지를 본다.
+`hindsight/RecorderOverheadEndToEndTest.java` 가 실험 ⑪ 이고, 기록기를 **뗀 앱과 붙인 앱을
+견준다** — 🔴 그리고 그 결과는 「차이가 없다」가 아니라 **「이 자로는 안 보인다」**였다.
+재려는 값(수십 µs)이 스프링 요청의 잡음(2,326µs)보다 작기 때문이다.
 
 🔴 **`SqlTap`·`HttpTap` 은 v0 기록기가 «아니다».** 실측용으로 먼저 만든 것이고,
 정식 기록기는 `hindsight-recorder-simple` 모듈이다. 실험 코드를 지우지 않는 이유는
