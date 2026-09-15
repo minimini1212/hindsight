@@ -41,6 +41,11 @@ docs/reports/
 
 ## 📅 날짜별
 
+### [2026-09-15](2026-09-15/)
+| 무엇 | 결과 |
+| --- | --- |
+| 🔧 [PR 을 열려는데 `gh` 가 없다](2026-09-15/troubleshooting/PR을-열려는데-gh가-없다고-나온다.md) | 「작업을 마치면 PR 까지 연다」로 규율이 바뀌면서 부딪혔다. `gh` 2.100.0 을 깔았고, 🔴 **로그인 한 번은 사람이 해야 한다** |
+
 ### [2026-09-11](2026-09-11/)
 | 무엇 | 결과 |
 | --- | --- |
@@ -63,6 +68,7 @@ docs/reports/
 
 | 증상 | 언제 |
 | --- | --- |
+| [PR 을 열려는데 `gh: command not found` · 깔아도 `not logged into any GitHub hosts`](2026-09-15/troubleshooting/PR을-열려는데-gh가-없다고-나온다.md) | 09-15 |
 | [테스트 출력의 한글이 `?? ?? ??` 로 깨진다](2026-09-11/troubleshooting/gradle-테스트-한글-깨짐.md) | 09-11 |
 | [`JAVA_HOME is set to an invalid directory` — 경로는 맞는데 그렇게 나온다](2026-09-11/troubleshooting/JAVA_HOME이-올바른-디렉터리가-아니라고-나온다.md) | 09-11 |
 | [`git push` 가 아무 말 없이 멈춘다 · WSL 에서는 `could not read Username`](2026-09-11/troubleshooting/git-push-가-아무-말-없이-멈춘다.md) | 09-11 |
