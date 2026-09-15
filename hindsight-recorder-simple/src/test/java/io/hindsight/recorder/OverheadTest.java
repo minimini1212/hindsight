@@ -126,10 +126,12 @@ class OverheadTest {
         long 넣기전 = OverheadHarness.usedHeapBytes();
 
         int 개수 = 50_000;
+        int 받아준것 = 0;
         for (int i = 0; i < 개수; i++) {
             r.recordSql("select o from Order o where o.memberId = ? and o.status = ?",
                     List.of(i, "PAID"), 1, 3);
         }
+        받아준것 = 개수 - (int) r.droppedEventsForTest();
         // 🔴 큐에 남은 것까지 링에 넣어야 «들고 있는 양»이 확정된다.
         boolean 다옮겼나 = r.awaitDrainedForTest(Duration.ofSeconds(30));
 
@@ -140,8 +142,10 @@ class OverheadTest {
 
         System.out.println();
         System.out.println("── 실험 ⑩-③ 크기 어림 vs 실제 힙 ──");
-        System.out.printf("  넣은 이벤트   : %,d건 (링에 담긴 것 %,d건, 다 옮겼나 %s)%n",
-                개수, 링에담긴수, 다옮겼나 ? "예" : "🔴 아니오");
+        System.out.printf("  넣은 이벤트   : %,d건 (큐가 받아 준 것 %,d건, 버린 것 %,d건)%n",
+                개수, 받아준것, r.droppedEventsForTest());
+        System.out.printf("  링에 담긴 것  : %,d건 (다 옮겼나 %s)%n",
+                링에담긴수, 다옮겼나 ? "예" : "🔴 아니오");
         System.out.printf("  우리 어림     : %,d 바이트 (%.1f MB)%n", 어림, 어림 / 1024.0 / 1024);
         System.out.printf("  실제 힙 증가  : %,d 바이트 (%.1f MB)%n", 실제, 실제 / 1024.0 / 1024);
         if (어림 > 0 && 실제 > 0) {
@@ -151,7 +155,19 @@ class OverheadTest {
 
         // 🔴 여기서 「몇 배 이내」를 검사로 걸지 않는다. 힙 측정이 그만큼 정확하지 않다.
         //    숫자를 «남기는» 것이 이 시험의 일이고, 판단은 보고서에서 사람이 한다.
-        assertThat(링에담긴수).isEqualTo(개수);
+        //
+        // 🔴 그리고 「5만 건이 «전부» 링에 담긴다」로 걸지 «않는다». 큐가 차면 버리는 것이
+        //    이 설계의 «의도»라서, 기계가 바쁜 날에는 실제로 버려진다 —
+        //    실제로 2026-09-15 빌드 중에 821건이 버려져 이 검사가 깨졌다.
+        //    그렇게 쓴 검사는 「가끔 실패하는 검사」가 되고, 그건 사람이 넘기게 만들어
+        //    진짜 고장까지 같이 넘긴다.
+        //
+        //    대신 «보존»을 건다: 받아 준 것은 전부 링에 있어야 한다. 이건 기계가 바쁘든
+        //    말든 참이어야 하는 것이고, 어긋나면 이벤트가 «설명 없이 사라진» 것이다.
+        assertThat(링에담긴수)
+                .as("받아 준 이벤트가 설명 없이 사라지면 안 된다 (버린 것은 %d건)",
+                        r.droppedEventsForTest())
+                .isEqualTo(받아준것);
     }
 
     @Test
