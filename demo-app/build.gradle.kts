@@ -27,4 +27,9 @@ dependencies {
     implementation(project(":hindsight-recorder-simple"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+
+    // 🔴 «생성된» 테스트를 이 JVM 안에서 직접 돌리려면 JUnit 을 프로그램으로 부를 수 있어야 한다.
+    //    보통은 Gradle 이 대신 불러 주므로 testRuntimeOnly 로 충분한데, 여기서는
+    //    우리 코드가 Launcher 를 «직접» 쓰기 때문에 컴파일 시점에도 필요하다.
+    testImplementation(libs.junit.platform.launcher)
 }
