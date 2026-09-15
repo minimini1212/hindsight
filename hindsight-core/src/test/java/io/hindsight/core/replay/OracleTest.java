@@ -164,8 +164,24 @@ class OracleTest {
         private final Oracle oracle = new Oracle.QueryRepeatNotWorse();
 
         @Test
-        @DisplayName("반복이 그대로면 실패 — 버그가 안 고쳐졌다")
-        void 반복이_그대로면_실패() {
+        @DisplayName("🔴 반복이 «그대로»여도 실패다 — 이게 「패치 전에 실패했나」를 참으로 만드는 자리")
+        void 반복이_그대로면_실패다() {
+            // 기록과 «똑같이» 20번 반복 — 즉 아무것도 안 고쳤다.
+            List<String> 재생질의 = new ArrayList<>();
+            재생질의.add("select * from orders");
+            for (int i = 0; i < 20; i++) {
+                재생질의.add("select * from member where id = " + i);
+            }
+
+            OracleVerdict v = oracle.judge(n플러스원_기록(),
+                    ReplayObservation.builder().executedSql(재생질의).build());
+
+            assertThat(v.outcome()).isEqualTo(OracleVerdict.Outcome.FAIL);
+        }
+
+        @Test
+        @DisplayName("반복이 더 늘면 실패")
+        void 반복이_더_늘면_실패() {
             List<String> 재생질의 = new ArrayList<>();
             재생질의.add("select * from orders");
             for (int i = 0; i < 25; i++) {
@@ -239,6 +255,84 @@ class OracleTest {
             // 시간을 보는 오라클은 «없다». 있으면 안 된다.
             assertThat(oracles).allSatisfy(o ->
                     assertThat(o.name()).doesNotContain("시간").doesNotContain("ms"));
+        }
+    }
+
+    @Nested
+    @DisplayName("🔴 남의 질의를 기준으로 삼지 않는다 — 2026-09-15 실측으로 잡은 결함")
+    class 남의질의 {
+
+        private final Oracle oracle = new Oracle.QueryRepeatNotWorse();
+
+        /** 요청 «밖»의 질의(스키마 생성 · seed · 다른 요청)가 섞인 기록. */
+        private Recording 남의질의가_섞인_기록() {
+            List<Event> events = new ArrayList<>();
+            events.add(요청(200, "{}", false));                       // corrId = r-1
+            // 이 요청이 낸 것: 목록 1 + 회원 3 = N+1 이 3번 반복
+            events.add(질의(2, "select * from orders"));
+            for (int i = 0; i < 3; i++) {
+                events.add(질의(3 + i, "select * from member where id = " + i));
+            }
+            // 🔴 요청 «밖»의 것 — seed 가 같은 모양을 10번 냈다. corrId 가 없다.
+            for (int i = 0; i < 10; i++) {
+                events.add(new Event.Sql(20 + i, null, T0, "t", 1L,
+                        "insert into orders (product) values ('물건" + i + "')",
+                        List.of(), null, null, false, null, null));
+            }
+            SqlShapes.Shape seed = SqlShapes.of("insert into orders (product) values ('x')");
+            Summary summary = new Summary(60,
+                    List.of(new Summary.SqlShape(seed.hash(), seed.normalized(), 10, 20)),
+                    List.of(), null);
+            return 기록(지연방아쇠(), events, summary);
+        }
+
+        @Test
+        @DisplayName("🔴 요청 밖의 질의가 문턱을 올려서 «버그를 못 고쳤는데 통과»하면 안 된다")
+        void 남의_질의가_문턱이_되면_안_된다() {
+            // 재생도 똑같이 N+1 을 3번 냈다 — 즉 «안 고쳐졌다».
+            List<String> 재생질의 = new ArrayList<>();
+            재생질의.add("select * from orders");
+            for (int i = 100; i < 103; i++) {
+                재생질의.add("select * from member where id = " + i);
+            }
+
+            OracleVerdict v = oracle.judge(남의질의가_섞인_기록(),
+                    ReplayObservation.builder().executedSql(재생질의).build());
+
+            // 남의 질의(10번)를 기준으로 삼으면 3 < 10 이라 «통과»가 나온다.
+            // 이 요청의 것(3번)을 기준으로 삼아야 «그대로»라는 것이 보인다.
+            assertThat(v.outcome()).isNotEqualTo(OracleVerdict.Outcome.PASS);
+        }
+
+        @Test
+        @DisplayName("이 요청이 낸 질의만 세면 반복이 늘었을 때 실패로 나온다")
+        void 이_요청의_것만_센다() {
+            List<String> 재생질의 = new ArrayList<>();
+            재생질의.add("select * from orders");
+            for (int i = 0; i < 7; i++) {          // 3번이었던 것이 7번으로 늘었다
+                재생질의.add("select * from member where id = " + i);
+            }
+
+            OracleVerdict v = oracle.judge(남의질의가_섞인_기록(),
+                    ReplayObservation.builder().executedSql(재생질의).build());
+
+            assertThat(v.outcome()).isEqualTo(OracleVerdict.Outcome.FAIL);
+            assertThat(v.reason()).contains("7").contains("3");
+        }
+
+        @Test
+        @DisplayName("🔴 어느 질의가 이 요청 것인지 «가려낼 수 없으면» 통과가 아니라 「판정 못 함」")
+        void 가려낼_수_없으면_판정_못_함() {
+            // 진입점에 상관 식별자가 없는 기록 — 어느 질의가 그 요청 것인지 알 수 없다.
+            Event.HttpIn 식별자없는요청 = new Event.HttpIn(1, null, T0, "t", 120L,
+                    "GET", "/api/orders", null, null, Map.of(),
+                    null, false, 0, 200, "{}", false);
+            Recording 기록 = 기록(지연방아쇠(), List.of(식별자없는요청, 질의(2, "select 1")), null);
+
+            OracleVerdict v = oracle.judge(기록,
+                    ReplayObservation.builder().executedSql(List.of("select 1")).build());
+
+            assertThat(v.outcome()).isEqualTo(OracleVerdict.Outcome.NOT_JUDGED);
         }
     }
 }

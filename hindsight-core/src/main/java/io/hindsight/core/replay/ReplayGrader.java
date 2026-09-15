@@ -96,6 +96,14 @@ public final class ReplayGrader {
         // ③④ 못 잡은 것 · 못 되돌린 것을 모은다.
         Set<String> missing = new LinkedHashSet<>();
 
+        // 🔴 재생은 질의를 냈는데 «기록에서 어느 질의가 그 요청 것인지» 가려낼 수 없으면,
+        //    갈라졌는지를 판단할 수 없다. 그때 조용히 넘어가면 「갈라지지 않았다」가 되고,
+        //    그건 확인한 적 없는 주장이다 — 「모름」을 「없음」으로 접는 바로 그 모양이다.
+        if (observation.executedSql() != null && Oracle.queriesOfRequest(recording) == null) {
+            missing.add("QUERY_SCOPE");
+            notes.add("기록에서 «이 요청이 낸» 질의를 가려낼 수 없어, 갈라졌는지를 판단하지 못했다");
+        }
+
         if (stateRestore == null) {
             missing.add("STATE");
             notes.add("재생 전에 무엇을 되돌렸는지 «안 봤다». 되돌렸다고 칠 수 없다");
@@ -185,30 +193,30 @@ public final class ReplayGrader {
                 verdict);
     }
 
-    /** 기록이 들고 있는 질의 모양. 요약층이 있으면 그걸 쓰고, 없으면 전문층에서 만든다. */
+    /**
+     * 🔴 <b>이 요청이 «직접» 낸 질의</b>의 모양만 모은다.
+     *
+     * <h2>요약층을 쓰지 않는 이유</h2>
+     * 요약층은 60초 창이라 <b>그 요청과 무관한 질의가 들어 있다</b> — 앱이 뜨면서 만든 스키마,
+     * 다른 요청, 배치 작업. 데이터 계약이 두 층을 가르면서 「요약층은 재생엔 못 쓴다」고
+     * 못 박은 것이 이 때문이다.
+     *
+     * <p>여기서 남의 질의까지 「아는 모양」에 넣으면, 재생이 낸 <b>새 질의를 「원래 있던 것」으로
+     * 착각</b>해서 {@code DIVERGED} 를 놓친다. 그러면 「제대로 고쳤는데 채점 불가」를 알려 주는
+     * 장치가 조용히 꺼진다.
+     */
     private static Map<String, Summary.SqlShape> recordedShapes(Recording recording) {
         Map<String, Summary.SqlShape> shapes = new LinkedHashMap<>();
-
-        Summary summary = recording.summary();
-        if (summary != null && summary.sqlShapes() != null) {
-            for (Summary.SqlShape shape : summary.sqlShapes()) {
-                shapes.put(shape.sqlHash(), shape);
-            }
-        }
-        if (!shapes.isEmpty() || recording.events() == null) {
+        List<Event.Sql> ofRequest = Oracle.queriesOfRequest(recording);
+        if (ofRequest == null) {
             return shapes;
         }
-
-        // 🔴 요약층이 없는 기록도 있다(v0 초기 파일). 그때 「모양이 하나도 없다」로 두면
-        //    모든 질의가 「기록에 없는 것」이 되어 전부 DIVERGED 가 된다. 전문층에서 만든다.
         Map<String, Integer> counts = new LinkedHashMap<>();
         Map<String, String> normalized = new LinkedHashMap<>();
-        for (Event event : recording.events()) {
-            if (event instanceof Event.Sql sql) {
-                SqlShapes.Shape shape = SqlShapes.of(sql.sql());
-                counts.merge(shape.hash(), 1, Integer::sum);
-                normalized.putIfAbsent(shape.hash(), shape.normalized());
-            }
+        for (Event.Sql sql : ofRequest) {
+            SqlShapes.Shape shape = SqlShapes.of(sql.sql());
+            counts.merge(shape.hash(), 1, Integer::sum);
+            normalized.putIfAbsent(shape.hash(), shape.normalized());
         }
         counts.forEach((hash, count) ->
                 shapes.put(hash, new Summary.SqlShape(hash, normalized.get(hash), count, 0)));
