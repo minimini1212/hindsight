@@ -138,8 +138,29 @@ v0 의 기록 방법 (바이트코드 없음)
 
 | 모듈 | 자바 | 의존성 | 하는 일 | 단계 |
 | --- | --- | --- | --- | --- |
-| `hindsight-core` | 21 | model, Jackson, JUnit 5, Spring AI, picocli | **읽기·재생·오라클·진단·채점·명령어 전부** | v0 |
+| `hindsight-core` | 21 | model, Jackson (🔴 **그 외는 아래 제약을 먼저 본다**) | **읽기·재생·오라클·진단·채점·명령어 전부** | v0 |
 | `demo-app` | 21 | Spring Boot | 🔴 **진짜 서비스다. 소품이 아니다** (§3-4) | v0 |
+
+#### 🔴 `hindsight-core` 에 라이브러리를 더하면 «관측 대상 앱»으로 들어간다
+
+⚠️ **2026-09-16 에 실측으로 알았다.** 이 표는 원래 core 의 의존성에 Spring AI 와 picocli 를
+적어 뒀는데, 그건 **v0 기록기가 core 를 의존한다는 사실과 양립하지 않는다.**
+
+```
+core 에 picocli 를 넣는다
+  → recorder-simple 이 core 를 의존한다
+    → demo-app 이 recorder-simple 을 의존한다
+      → 🔴 picocli 가 «관측 대상 앱»의 클래스패스로 들어간다
+```
+
+실제로 넣어 보니 `checkRecorderDependencies` 가 빌드를 세웠고, demo-app 의 의존성 목록에
+picocli 가 나타나는 것도 확인했다.
+
+- **명령줄은 그래서 의존성 없이 만들었다** — 명령이 둘이라 직접 읽는 편이 싸다
+- ⬜ **진단이 Spring AI 를 쓰는 날**에는 피할 수 없다. 그때 `core.store`(기록 읽기·쓰기)를
+  따로 모듈로 떼어내고, 기록기는 그것만 의존하게 한다. 🔴 **그날이 언제인지는 사람이
+  기억하지 않아도 된다** — 감시선이 빌드를 세운다
+- 🧭 잰 값: [`reports/2026-09-16/hs-cli.md`](reports/2026-09-16/hs-cli.md)
 
 `hindsight-core` 안의 패키지: `store`(읽기·쓰기) · `privacy`(가명화) · `replay`(재생·오라클) ·
 `guard`(패치 경로 검사) · `brain`(진단·채점) · `cli`(명령어) · `mcp`(v3).
