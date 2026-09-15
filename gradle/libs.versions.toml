@@ -12,6 +12,11 @@ junit = "5.11.4"
 assertj = "3.26.3"
 picocli = "4.7.6"
 springboot = "3.4.1"
+# 🔴 아래 둘은 spring-boot 3.4.1 이 관리하는 것과 «같은» 버전으로 맞춰 둔다.
+# v0 기록기는 관측 대상 앱 안에서 도는데, 버전이 어긋나면 두 벌이 올라가서
+# ClassCastException 이 난다. 스프링을 올릴 때 이 둘도 같이 본다.
+servlet = "6.1.0"      # jakarta.servlet-api — 기록기는 compileOnly 로만 쓴다
+h2 = "2.3.232"         # 기록기 테스트가 진짜 DataSource 를 감싸 보는 데 쓴다
 springai = "1.0.0"
 shadow = "8.3.5"       # 셰이딩 플러그인 (com.gradleup.shadow)
 
@@ -25,6 +30,8 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
+servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version.ref = "servlet" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
 
 [plugins]
 springboot = { id = "org.springframework.boot", version.ref = "springboot" }
