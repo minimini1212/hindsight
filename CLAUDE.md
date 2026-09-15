@@ -174,19 +174,34 @@ propose one.
 ### Git
 
 - **Finishing a unit of work on a `<type>/<slug>` branch means: stage named paths, commit,
-  and `git push -u origin <that branch>`.** Changed by the user 2026-09-11, replacing
-  "the user pushes, Claude never pushes" — a local commit that looks pushed is the quietest
-  way to lose a day's work, and checking `git branch -r --contains <sha>` after the fact
-  only catches it if someone remembers to look.
+  `git push -u origin <that branch>`, and open the PR into `dev`.** Push was added by the
+  user 2026-09-11, replacing "the user pushes, Claude never pushes" — a local commit that
+  looks pushed is the quietest way to lose a day's work, and checking
+  `git branch -r --contains <sha>` after the fact only catches it if someone remembers to look.
+  **Opening the PR was added 2026-09-15**, replacing "opening the PR stays the user's action":
+  a pushed branch is safe but invisible — the diff, the checks and the reason for the work
+  only come together on the PR page, and that page is what the user actually looks at.
   - 🔴 **Only the branch that was just worked on.** Never `git push` `dev` or `main`,
     never `--force` / `--force-with-lease`, never `push --delete`. Rewriting or deleting
     what is already on the remote is the one thing a push must not do.
   - 🔴 **Never `git add .`** — stage named paths, every time. A push makes a stray
     staged file everyone else's problem.
-  - **Opening the PR stays the user's action.** Push puts the work somewhere safe;
-    merging into `dev` is a decision, and decisions are theirs.
-  - Report the branch name and the pushed SHA when the work is done, so there is nothing
-    to verify by hand.
+  - 🔴 **Open the PR, then stop. Never merge it.** Not through the PR, not by merging
+    locally and pushing, not with `--admin`, not by enabling auto-merge. Opening a PR
+    *proposes*; merging *decides*, and **what enters `dev` is the user's decision.**
+    The line moved from "before the PR" to "after the PR" — it did not disappear.
+  - **The PR is a proposal, so it says what it is proposing**: what changed, what was
+    measured, and 🔴 **what is still unverified**. A PR description that claims more than
+    the work proved is the same defect class as folding 「unknown」 into 「none」.
+    Title and body in Korean, like every other repo artifact — only the branch name is English.
+  - 🔴 **Opening a PR needs `gh`, and `gh` needs its own login** — the Windows credential
+    store that `git push` reads is not where `gh` looks, and Claude must never read a stored
+    token to call the API by hand. Installing `gh` and logging it in once:
+    `docs/reports/2026-09-15/troubleshooting/PR을-열려는데-gh가-없다고-나온다.md`.
+    Pushing has its own trap (the credential helper list must be emptied first):
+    `docs/reports/2026-09-11/troubleshooting/git-push-가-아무-말-없이-멈춘다.md`.
+  - Report the branch name, the pushed SHA and the PR URL when the work is done, so there
+    is nothing to verify by hand.
 - **Commit only when the work is actually finished**, not at every edit — one commit is one
   topic, the same topic the branch is named after. `./gradlew build` passes first
   (that run includes `checkDocLinks` and `checkAgentDependencies`).
