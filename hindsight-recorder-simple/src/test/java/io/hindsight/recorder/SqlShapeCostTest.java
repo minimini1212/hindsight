@@ -1,5 +1,6 @@
 package io.hindsight.recorder;
 
+import io.hindsight.model.SqlShapes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -29,11 +30,11 @@ class SqlShapeCostTest {
         String normalized = SummaryWindow.normalize(SQL);
         OverheadHarness.Result 지문 = OverheadHarness.measure(
                 "지문(SHA-256)", 20_000, 50, 10_000,
-                i -> consume(SqlFingerprint.hash(normalized)));
+                i -> consume(SqlShapes.hash(normalized)));
 
         OverheadHarness.Result 둘다 = OverheadHarness.measure(
                 "정규화 + 지문", 20_000, 50, 10_000,
-                i -> consume(SqlFingerprint.hash(SummaryWindow.normalize(SQL))));
+                i -> consume(SqlShapes.of(SQL).hash()));
 
         System.out.println();
         System.out.println("── 실험 ⑩-⑤ SQL 이벤트의 비용이 어디서 오나 ──");
