@@ -282,6 +282,66 @@ class DiagnosisTest {
     }
 
     @Nested
+    @DisplayName("🔴 「잠깐 안 되는 것」과 「영영 안 되는 것」을 가른다")
+    class 잠깐과_영영 {
+
+        /** 정해 둔 상태 코드를 차례로 돌려주는 가짜. 몇 번 두드렸는지 센다. */
+        private static final class 두드림세는_전송 implements HttpDiagnosis.전송 {
+            final java.util.List<Integer> 돌려줄것 = new ArrayList<>();
+            int 두드린횟수 = 0;
+
+            @Override
+            public 응답 보낸다(String url, Map<String, String> headers, String body) {
+                int 코드 = 돌려줄것.isEmpty() ? 200
+                        : 돌려줄것.get(Math.min(두드린횟수, 돌려줄것.size() - 1));
+                두드린횟수++;
+                return new 응답(코드, "{}", null);
+            }
+        }
+
+        @Test
+        @DisplayName("🔴 503 은 «다시 두드린다» — 서버가 「나중에 다시 하라」고 말하는 중이다")
+        void 일시적인_실패는_다시() {
+            // 2026-09-16 에 고리를 처음 끝까지 돌렸더니 첫 호출이 503 이었고,
+            // 그때 코드는 그걸 「키가 틀렸다」와 똑같이 다뤄서 고리가 거기서 끝났다.
+            assertThat(JdkHttpTransport.다시_두드리는_횟수)
+                    .as("한 번 만에 포기하면 과부하가 잠깐 있던 날 고리가 통째로 안 돈다")
+                    .isGreaterThan(1);
+            assertThat(JdkHttpTransport.첫_기다림.toMillis())
+                    .as("🔴 같은 속도로 두드리면 과부하를 «키운다»")
+                    .isPositive();
+        }
+
+        @Test
+        @DisplayName("🔴 401 은 «다시 안 두드린다» — 키가 틀린 건 기다려도 안 고쳐진다")
+        void 영구적인_실패는_바로() {
+            두드림세는_전송 전송 = new 두드림세는_전송();
+            전송.돌려줄것.add(401);
+
+            var r = new HttpDiagnosis(설정("키"), 전송, new Pseudonymizer("k")).진단한다(기록());
+
+            assertThat(전송.두드린횟수)
+                    .as("기다려도 안 고쳐지는 것을 세 번 두드리면 사람을 기다리게 할 뿐이다")
+                    .isEqualTo(1);
+            assertThat(r.불렀나()).isFalse();
+        }
+
+        @Test
+        @DisplayName("🔴 다시 두드린 것은 «예산을 안 깎는다» — 답을 못 받았으면 돈도 안 썼다")
+        void 다시_두드려도_예산은_그대로() {
+            두드림세는_전송 전송 = new 두드림세는_전송();
+            전송.돌려줄것.add(503);
+
+            var r = new HttpDiagnosis(설정("키"), 전송, new Pseudonymizer("k")).진단한다(기록());
+
+            assertThat(r.불렀나()).isFalse();
+            assertThat(r.든_센트())
+                    .as("예산은 「몇 번 시킬 것인가」이고, 두드리는 것은 「한 번을 보내는 일」이다")
+                    .isEqualTo(0L);
+        }
+    }
+
+    @Nested
     @DisplayName("🔴 기록은 «자료»이지 «지시»가 아니다")
     class 지시가_아니다 {
 

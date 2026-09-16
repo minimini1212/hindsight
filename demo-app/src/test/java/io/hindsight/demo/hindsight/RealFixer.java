@@ -54,8 +54,21 @@ final class RealFixer implements FixPipeline.수선공 {
     private final PatchApplier 적용기;
     private final 명령 명령기;
 
-    /** 🔴 지금 판의 패치. ㉣ 이 통과한 뒤 «다시 붙일» 때 필요하다. */
+    /**
+     * 🔴 지금 판의 패치. 두 가지에 쓴다.
+     * <ol>
+     *   <li>㉣ 이 통과한 뒤 «다시 붙일» 때</li>
+     *   <li>🔴 되돌린 «뒤»에도 「LLM 이 뭘 냈는지」를 남길 때</li>
+     * </ol>
+     *
+     * <p>⚠️ 2026-09-16 에 여기를 «되돌리기가 비우는 목록»에서 읽으려다 실패했다 —
+     * 되돌리고 나면 목록이 비어서 <b>패치가 아무 데도 안 남았다.</b>
+     * 「되돌렸다」와 「버렸다」는 다른 사실인데, 그때는 버린 것이 됐다.
+     */
     private Map<String, String> 지금패치 = Map.of();
+
+    /** 마지막 바깥 명령의 출력. 🔴 「테스트가 실패했다」와 「빌드를 못 돌렸다」를 가르는 데 쓴다. */
+    private String 마지막출력 = "";
 
     /** 되돌리기용. 경로 → 패치 «전» 내용. 🔴 없던 파일이면 {@code null} 이 「없었다」다. */
     private final Map<String, String> 원래내용 = new LinkedHashMap<>();
@@ -90,19 +103,46 @@ final class RealFixer implements FixPipeline.수선공 {
         this.명령기 = 명령기;
     }
 
+    /**
+     * 🔴 <b>여기서 «적용하지 않는다». 경로만 본다.</b>
+     *
+     * <h2>왜 — 재서 알았다</h2>
+     * 처음에는 여기서 바로 파일을 썼다. 그랬더니 네 겹의 ㉠(기준선 실패)이 <b>실패</b>했다:
+     * <i>「생성된 테스트가 «패치 전»에도 통과한다」</i>.
+     *
+     * <p>당연했다 — {@code VerificationLoop} 은 <b>㉠ 을 «맨 처음»에</b> 재는데,
+     * 그때 이미 패치가 디스크에 있었다. 즉 <b>「패치 전」이 「패치 후」였다.</b>
+     *
+     * <p>🔴 그러면 고리가 「버그를 못 살린 테스트다」라며 <b>LLM 을 부르지도 않고 끝낸다</b> —
+     * 실은 패치가 멀쩡했는데도.
+     *
+     * <p>지금은 <b>경로 검사만</b> 하고, 쓰기는 {@code 패치를_적용한다()} 에서 한다.
+     * 그게 {@code VerificationLoop} 이 요구하는 순서다.
+     *
+     * @return 🔴 경로에 걸리면 {@code null}. 그때는 <b>아무것도 안 썼다</b>
+     */
     @Override
     public VerificationLoop.Runner 준비한다(Map<String, String> 패치) {
+        // 🔴 «지난 시도»가 붙여 놓은 것이 남아 있으면 먼저 뗀다.
+        //
+        // ⚠️ 2026-09-16 에 여기가 없어서 크게 헛돌았다. 네 겹은 ㉠ 에서 일찍 끝날 수 있고
+        //    (「패치 전에도 통과한다」), 그때는 «되돌리는 코드가 안 불린다».
+        //    그러면 다음 시도의 준비 단계가 «이미 패치된 파일»을 「원래 내용」으로 읽고,
+        //    그 뒤로는 되돌려도 패치된 상태로 돌아간다 — 기준선이 기준선이 아니게 된다.
+        //    🔴 그 상태에서는 ㉠ 이 «영원히» 「패치 전에도 통과한다」로 나온다.
+        되돌린다();
+
+        // 🔴 «쓰지 않고» 판정만 받는다. 실제 파일 검사(존재 · 심볼릭 링크)도 여기서 같이 한다.
+        PatchVerdict 판정 = 적용기.judgeOnly(패치);
+        마지막판정 = 판정;
+        if (판정.level() != PatchVerdict.Level.ALLOW) {
+            원래내용.clear();
+            지금패치 = Map.of();
+            return null;
+        }
         // 🔴 쓰기 «전»에 원래 내용을 들고 있는다. 안 그러면 되돌릴 수 없다.
         원래내용.clear();
         패치.keySet().forEach(경로 -> 원래내용.put(경로, 읽는다(패치뿌리.resolve(경로))));
-
-        PatchApplier.Result 결과 = 적용기.apply(패치);
-        마지막판정 = 결과.verdict();
-        if (!결과.applied()) {
-            // 🔴 경로에 걸렸다. «아무것도 안 썼다» — 되돌릴 것도 없다.
-            원래내용.clear();
-            return null;
-        }
         지금패치 = Map.copyOf(패치);
         return new Runner();
     }
@@ -139,18 +179,39 @@ final class RealFixer implements FixPipeline.수선공 {
         return List.copyOf(원래내용.keySet());
     }
 
+    /**
+     * 🔴 <b>LLM 이 낸 패치. 되돌린 «뒤»에도 남아 있다.</b>
+     *
+     * <p>안 남기면 되돌리는 순간 사라지고, 왜 통과했는지/왜 실패했는지를 나중에 못 본다.
+     */
+    Map<String, String> 지금패치() {
+        return 지금패치;
+    }
+
+    /** 마지막 바깥 명령의 출력. 🔴 실패했을 때 «무엇 때문에»를 사람이 읽어야 한다. */
+    String 마지막출력() {
+        return 마지막출력;
+    }
+
     // ────────────────────────────────────────────────────────────────────────
 
     private final class Runner implements VerificationLoop.Runner {
 
-        /** 🔴 지금 패치가 «붙어 있나». 네 겹이 붙였다 뗐다 하므로 여기서 들고 있어야 한다. */
-        private boolean 붙어있나 = true;
+        /**
+         * 🔴 지금 패치가 «붙어 있나». 네 겹이 붙였다 뗐다 하므로 여기서 들고 있어야 한다.
+         * ⚠️ <b>{@code false} 로 시작한다</b> — 준비 단계에서는 «안 쓴다».
+         */
+        private boolean 붙어있나 = false;
 
         @Override
         public boolean 재생_테스트가_통과하나() {
             // 🔴 새 프로세스로 돌린다. 지금 JVM 은 «패치 전» 클래스를 들고 있다.
-            var r = 명령기.돌린다(List.of(gradlew(), ":demo-app:test",
-                    "--tests", "*BaselineFailsTest*", "--console=plain"), 빌드뿌리);
+            // 🔴 «한 방향만» 보는 시험을 쓴다. BaselineFailsTest 는 「버그가 있으면 실패,
+            //    고치면 통과」를 둘 다 단언해서, 패치가 붙으면 앞쪽 단언이 반드시 깨진다 —
+            //    그러면 ㉡ 이 영영 통과할 수 없다. 2026-09-16 에 실제로 그렇게 두 번 실패했다.
+            var r = 명령기.돌린다(List.of(gradlew(), ":demo-app:replayCheck",
+                    "--console=plain"), 빌드뿌리);
+            마지막출력 = r.출력();
             return r.ok();
         }
 
@@ -158,6 +219,7 @@ final class RealFixer implements FixPipeline.수선공 {
         public boolean 기존_테스트가_전부_통과하나() {
             var r = 명령기.돌린다(List.of(gradlew(), ":demo-app:test",
                     "--tests", "io.hindsight.demo.order.*", "--console=plain"), 빌드뿌리);
+            마지막출력 = r.출력();
             return r.ok();
         }
 
@@ -209,9 +271,16 @@ final class RealFixer implements FixPipeline.수선공 {
         public 결과 돌린다(List<String> 명령줄, Path 작업디렉터리) {
             List<String> 실제 = new ArrayList<>(명령줄);
             if ("cmd".equals(실제.getFirst())) {
+                // 🔴 «절대 경로»로 부른다. 2026-09-16 에 "gradlew.bat" 만 줬더니
+                //    'gradlew.bat'은(는) 내부 또는 외부 명령이 아닙니다 가 났다 —
+                //    PATH 에 없고, 작업 디렉터리를 줘도 cmd 는 그걸 PATH 로 안 본다.
+                //
+                // ⚠️ 그때 그 실패가 «테스트 실패»로 읽혔다. 세 번 시도해서 세 번 다
+                //    「패치 후에도 실패한다」가 나왔는데, 실은 한 번도 «안 돌았다».
+                //    그래서 지금은 바깥 명령의 출력을 남긴다 — 그게 이걸 찾아 줬다.
                 실제.set(0, "cmd");
                 실제.add(1, "/c");
-                실제.add(2, "gradlew.bat");
+                실제.add(2, 작업디렉터리.resolve("gradlew.bat").toAbsolutePath().toString());
             }
             try {
                 Process p = new ProcessBuilder(실제)

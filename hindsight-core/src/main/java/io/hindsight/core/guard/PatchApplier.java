@@ -71,6 +71,26 @@ public final class PatchApplier {
      *
      * @param newContents 경로 → 새 내용. 경로는 저장소 뿌리 기준 상대 경로다
      */
+    /**
+     * 🔴 <b>«쓰지 않고» 판정만 한다.</b>
+     *
+     * <p>부르는 쪽이 「지금은 아직 쓰면 안 되는데 경로는 미리 보고 싶다」일 때 쓴다 —
+     * 네 겹 채점이 <b>㉠(패치 «전»에 실패하나)을 맨 처음</b> 재기 때문에, 그 전에
+     * 파일을 쓰면 「패치 전」이 「패치 후」가 된다.
+     *
+     * <p>⚠️ {@link #apply} 와 <b>같은 판정</b>을 쓴다. 두 벌로 만들면 한쪽만 고쳐지고,
+     * 그러면 「미리 볼 때는 통과했는데 쓸 때 거절되는」 자리가 생긴다.
+     */
+    public PatchVerdict judgeOnly(Map<String, String> newContents) {
+        List<String> paths = new ArrayList<>(newContents.keySet());
+        PatchVerdict verdict = guard.judge(paths);
+        if (verdict.level() != PatchVerdict.Level.ALLOW) {
+            return verdict;
+        }
+        PatchVerdict realPathVerdict = checkRealPaths(paths);
+        return realPathVerdict != null ? realPathVerdict : verdict;
+    }
+
     public Result apply(Map<String, String> newContents) {
         List<String> paths = new ArrayList<>(newContents.keySet());
 

@@ -101,3 +101,27 @@ tasks.register<JavaExec>("fix") {
         project.findProperty("store")?.toString()?.let { systemProperty("HINDSIGHT_STORE_DIR", it) }
     }
 }
+
+// 🔴 ReplayPassesTest 는 «지금 코드에 증상이 남아 있으면 실패»하는 시험이다.
+//    저장소의 기본 상태는 「버그가 있는」 상태이므로, 전체 빌드에서는 «빼 둔다» —
+//    안 빼면 빌드가 늘 빨간불이고, 그러면 아무도 빨간불을 안 본다.
+tasks.named<Test>("test") {
+    filter { excludeTestsMatching("io.hindsight.demo.hindsight.ReplayPassesTest") }
+}
+
+// ⚠️ 그런데 «빼 두면 --tests 로 고를 수도 없다».
+//    2026-09-16 에 고리가 그걸로 세 번 헛돌았다 —
+//    `No tests found for given includes: [*ReplayPassesTest*]` 가 「테스트 실패」로 읽혔다.
+// 🔴 그래서 «전용 작업»을 따로 둔다. 고리는 이걸 부른다.
+tasks.register<Test>("replayCheck") {
+    group = "verification"
+    description = "지금 코드에서 재생 테스트가 통과하는지 본다 (고치는 고리가 부른다)"
+
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("io.hindsight.demo.hindsight.ReplayPassesTest") }
+
+    // 🔴 결과를 캐시하지 않는다. 같은 소스라도 «패치가 붙었나»에 따라 답이 달라져야 한다.
+    outputs.upToDateWhen { false }
+}

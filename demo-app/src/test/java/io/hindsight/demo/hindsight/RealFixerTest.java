@@ -50,15 +50,49 @@ class RealFixerTest {
     class 쓰고_되돌린다 {
 
         @Test
-        @DisplayName("패치를 «진짜로» 파일에 쓴다")
-        void 진짜로_쓴다(@TempDir Path 뿌리) throws IOException {
+        @DisplayName("🔴 «준비»는 안 쓴다 — 네 겹이 ㉠(패치 전)을 «맨 처음» 재기 때문이다")
+        void 준비는_안_쓴다(@TempDir Path 뿌리) throws IOException {
             Path f = 파일을_만든다(뿌리, "class OrderService { /* 버그 */ }");
             RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
 
             var runner = 수선.준비한다(Map.of(경로, "class OrderService { /* 고침 */ }"));
 
             assertThat(runner).isNotNull();
+            assertThat(Files.readString(f))
+                    .as("🔴 여기서 쓰면 「패치 전」이 「패치 후」가 되고, ㉠ 이 영원히 "
+                            + "「패치 전에도 통과한다」로 나온다 — 2026-09-16 에 실제로 그랬다")
+                    .contains("버그");
+        }
+
+        @Test
+        @DisplayName("패치를 «진짜로» 파일에 쓴다 — 붙이라고 할 때")
+        void 진짜로_쓴다(@TempDir Path 뿌리) throws IOException {
+            Path f = 파일을_만든다(뿌리, "class OrderService { /* 버그 */ }");
+            RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
+
+            var runner = 수선.준비한다(Map.of(경로, "class OrderService { /* 고침 */ }"));
+            assertThat(runner.패치를_적용한다()).isTrue();
+
             assertThat(Files.readString(f)).contains("고침");
+        }
+
+        @Test
+        @DisplayName("🔴 «지난 시도»가 붙여 놓은 것을 먼저 뗀다 — 안 그러면 기준선이 기준선이 아니다")
+        void 지난_시도를_먼저_뗀다(@TempDir Path 뿌리) throws IOException {
+            Path f = 파일을_만든다(뿌리, "class OrderService { /* 버그 */ }");
+            RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
+
+            // 1차 시도: 붙이고 «안 떼고» 끝난다 (네 겹이 ㉠ 에서 일찍 끝나면 실제로 그렇게 된다)
+            수선.준비한다(Map.of(경로, "class OrderService { /* 1차 */ }")).패치를_적용한다();
+            assertThat(Files.readString(f)).contains("1차");
+
+            // 2차 시도의 준비
+            수선.준비한다(Map.of(경로, "class OrderService { /* 2차 */ }"));
+
+            assertThat(Files.readString(f))
+                    .as("🔴 안 떼면 «1차 패치»가 「원래 내용」으로 기록되고, 그 뒤로는 "
+                            + "되돌려도 패치된 상태로 돌아간다")
+                    .contains("버그");
         }
 
         @Test
@@ -68,7 +102,7 @@ class RealFixerTest {
             Path f = 파일을_만든다(뿌리, 원래);
             RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
 
-            수선.준비한다(Map.of(경로, "class OrderService { /* 고침 */ }"));
+            수선.준비한다(Map.of(경로, "class OrderService { /* 고침 */ }")).패치를_적용한다();
             수선.되돌린다();
 
             assertThat(Files.readString(f))
@@ -83,7 +117,7 @@ class RealFixerTest {
             RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
             String 새경로 = "src/main/java/a/NewThing.java";
 
-            수선.준비한다(Map.of(새경로, "class NewThing {}"));
+            수선.준비한다(Map.of(새경로, "class NewThing {}")).패치를_적용한다();
             assertThat(뿌리.resolve(새경로)).exists();
 
             수선.되돌린다();
@@ -100,6 +134,7 @@ class RealFixerTest {
             RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
 
             var runner = 수선.준비한다(Map.of(경로, "class OrderService { /* 고침 */ }"));
+            runner.패치를_적용한다();
             runner.패치를_되돌린다();
             assertThat(Files.readString(f)).contains("버그");
 
@@ -166,7 +201,7 @@ class RealFixerTest {
             runner.기존_테스트가_전부_통과하나();
 
             assertThat(명령.부른것).hasSize(2);
-            assertThat(명령.부른것.get(0)).contains(":demo-app:test").contains("BaselineFails");
+            assertThat(명령.부른것.get(0)).contains(":demo-app:replayCheck");
             assertThat(명령.부른것.get(1))
                     .as("🔴 ㉢ 은 «앱 자신의» 테스트를 돌린다. 도구의 시험을 돌리면 재귀가 된다")
                     .contains("io.hindsight.demo.order.*");

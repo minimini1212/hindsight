@@ -100,7 +100,7 @@ public final class FixRunner {
                             수선, 원래내용, null, null);
         } finally {
             // 🔴 무슨 일이 있어도 되돌린다. 안 그러면 시험 한 번이 저장소를 바꿔 놓는다.
-            고친것을_남긴다(모듈뿌리, 뿌리, 수선, out);
+            고친것을_남긴다(뿌리, 수선, out);
             수선.되돌린다();
         }
         long 걸린초 = (System.nanoTime() - 시작) / 1_000_000_000;
@@ -130,23 +130,26 @@ public final class FixRunner {
      * <p>안 남기면 LLM 이 낸 패치가 <b>아무 데도 안 남는다</b> — 되돌리는 순간 사라진다.
      * 그러면 왜 통과했는지/왜 실패했는지를 나중에 볼 수가 없다.
      */
-    private static void 고친것을_남긴다(Path 모듈뿌리, Path 빌드뿌리, RealFixer 수선, PrintStream out) {
-        var 경로들 = 수선.건드린_경로();
-        if (경로들.isEmpty()) {
+    private static void 고친것을_남긴다(Path 빌드뿌리, RealFixer 수선, PrintStream out) {
+        // 🔴 «수선공이 들고 있는 패치»에서 읽는다. 되돌리기가 비우는 목록에서 읽으면
+        //    이미 비어 있어서 아무것도 안 남는다 — 2026-09-16 에 실제로 그랬다.
+        var 패치 = 수선.지금패치();
+        if (패치.isEmpty()) {
             return;
         }
         Path 보관 = 빌드뿌리.resolve("build").resolve("hindsight-patch");
         try {
             Files.createDirectories(보관);
-            for (String 경로 : 경로들) {
-                Path 원본 = 모듈뿌리.resolve(경로);
-                if (!Files.isRegularFile(원본)) {
-                    continue;
-                }
-                Path 사본 = 보관.resolve(경로.replace('/', '_'));
-                Files.copy(원본, 사본, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            for (var e : 패치.entrySet()) {
+                Files.writeString(보관.resolve(e.getKey().replace('/', '_')),
+                        e.getValue(), StandardCharsets.UTF_8);
             }
-            out.println("  🗂 고친 내용을 남겼다: " + 보관.toAbsolutePath());
+            out.println("  🗂 LLM 이 낸 패치를 남겼다: " + 보관.toAbsolutePath());
+            var 출력 = 수선.마지막출력();
+            if (!출력.isBlank()) {
+                Files.writeString(보관.resolve("_마지막_빌드_출력.txt"), 출력, StandardCharsets.UTF_8);
+                out.println("  🗂 마지막 빌드 출력도 남겼다 — 「테스트 실패」와 「빌드 실패」를 가르려면 필요하다");
+            }
         } catch (IOException e) {
             // 🔴 못 남겼다고 되돌리기를 건너뛰지 않는다. 되돌리는 쪽이 더 중요하다.
             out.println("  ⚠️ 고친 내용을 못 남겼다: " + e.getMessage());
