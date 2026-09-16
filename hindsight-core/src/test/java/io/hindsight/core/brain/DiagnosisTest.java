@@ -334,6 +334,36 @@ class DiagnosisTest {
         }
 
         @Test
+        @DisplayName("🔴 가격이 «0» 이면 세 번 다 돈다 — 「공짜」와 「모름」은 다르다")
+        void 공짜면_세번_돈다() {
+            // 무료 등급이면 가격이 진짜로 0 이다. 그건 「모른다」가 아니라 «아는 값»이므로
+            // 예산이 정상으로 돌아야 한다. 🔴 이 둘을 같게 다루면 무료 등급에서도
+            // 한 번만 부르고 멈추는데, 그건 「예산이 없다」가 아니라 «버그»다.
+            var 공짜 = new LlmConfig("키", "https://x/v1/", "m", 3, 100, 0.0, 0.0);
+            assertThat(공짜.센트로_바꾼다(5_000_000, 2_000_000)).isZero();
+
+            AttemptBudget 예산 = new AttemptBudget(공짜.maxAttempts(), 공짜.maxCents());
+            for (int i = 0; i < 3; i++) {
+                assertThat(예산.한번_더_되나(0).되나()).as("%d번째".formatted(i + 1)).isTrue();
+                예산.한번_썼다(0);
+            }
+            assertThat(예산.한번_더_되나(0).되나())
+                    .as("공짜여도 «시도 횟수»는 끝난다 — 200번 실패한 것은 못 고치는 것이다")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("🔴 코드의 기본값은 여전히 «모름»이다 — .env.example 의 0 이 코드를 안 바꾼다")
+        void 코드_기본값은_모름() {
+            var 설정_없음 = LlmConfig.from(k -> null);
+
+            assertThat(설정_없음.usdPerMillionInputTokens())
+                    .as("🔴 안 적었으면 「모른다」다. 0 으로 접으면 상한이 없는 것과 같아진다")
+                    .isNull();
+            assertThat(설정_없음.센트로_바꾼다(1000, 1000)).isNull();
+        }
+
+        @Test
         @DisplayName("🔴 describe() 에 키가 «안» 나온다")
         void 키가_안_새어나온다() {
             assertThat(설정("비밀키값").describe()).doesNotContain("비밀키값");
