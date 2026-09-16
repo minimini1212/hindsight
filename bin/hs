@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# ===========================================================================
+#  hs — 기록을 들여다보는 명령어 (리눅스 · macOS · Git Bash)
+#
+#  사용법:  bin/hs list
+#           bin/hs show <번호>
+#           bin/hs test <번호>
+#
+#  🔴 자바 21 이 필요하다. hindsight-core 는 21 로 컴파일된다.
+#     그냥 돌리면 UnsupportedClassVersionError 가 나는데, 그 메시지는
+#     「class file version 65.0」 같은 숫자만 말해서 무엇을 해야 하는지가 안 보인다.
+#     그래서 여기서 «먼저» 확인하고 사람 말로 알려 준다.
+# ===========================================================================
+set -euo pipefail
+
+여기="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HS_JAR="$여기/../build/hs/hs.jar"
+
+if [ ! -f "$HS_JAR" ]; then
+  echo "hs.jar 이 없다: $HS_JAR"
+  echo
+  echo "먼저 만든다:  ./gradlew :hindsight-core:hsJar"
+  exit 2
+fi
+
+자바="java"
+if [ -n "${JAVA_HOME:-}" ]; then
+  자바="$JAVA_HOME/bin/java"
+fi
+
+if ! "$자바" -version >/dev/null 2>&1; then
+  echo "자바를 찾지 못했다. JAVA_HOME 을 정하거나 java 를 PATH 에 넣는다."
+  exit 2
+fi
+
+# `java -version` 의 첫 줄에서 주 버전만 꺼낸다. "21.0.12" 도 "1.8.0" 도 첫 토막이면 된다.
+버전줄=$("$자바" -version 2>&1 | head -1)
+주버전=$(echo "$버전줄" | sed -n 's/.*version "\([0-9]*\).*/\1/p')
+
+if [ -n "$주버전" ] && [ "$주버전" -lt 21 ]; then
+  echo "🔴 자바 $주버전 로는 hs 를 못 돌린다. 21 이상이 필요하다."
+  echo
+  echo "   지금 쓰는 자바: $자바"
+  echo "   이 저장소가 받아 둔 21: ~/.gradle/jdks/eclipse_adoptium-21-amd64-windows.2"
+  echo
+  echo "   이렇게 돌린다:"
+  echo "     JAVA_HOME=~/.gradle/jdks/eclipse_adoptium-21-amd64-windows.2 bin/hs list"
+  exit 2
+fi
+
+# 🔴 -Dfile.encoding 만으로는 부족하다. 자바 18 부터 표준 출력의 인코딩은
+#    stdout.encoding 이 따로 정한다 — 안 주면 콘솔 코드페이지를 따라가서
+#    한글이 ?? 로 나갈 수 있다.
+exec "$자바" -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 \
+  -jar "$HS_JAR" "$@"

@@ -567,6 +567,39 @@ brain → guard · replay      ·      cli → 전부 (조립하는 자리)
 ✅ **실제로 막는 것을 확인했다** — `brain` 에 `java.nio.file.Files` 를 넣으니 빌드가
 실패했고, `store` 가 `brain` 을 import 하게 해도 실패했다. 되돌리니 성공했다.
 
+### 빌드 파일 — `build.gradle.kts` 의 `checkLauncherScripts`
+
+🔴 **`bin/` 의 실행 스크립트가 각 운영체제에서 «돌 수 있는 모양»인지 본다** (2026-09-16).
+
+```
+bin/*.bat  →  CRLF 인가 · ASCII 인가
+bin/hs     →  CRLF 가 «없는»가
+```
+
+배치 파일이 LF 뿐이면 cmd 가 줄을 엉뚱한 자리에서 잘라 **주석 조각을 명령으로 실행한다.**
+한글이 들어 있으면 콘솔 코드페이지로 읽혀 역시 명령이 된다. 반대로 셸 스크립트에 CRLF 가
+섞이면 셔뱅 뒤의 `` 때문에 「해석기를 못 찾겠다」로 죽는다.
+
+⚠️ **`.gitattributes` 에 `*.bat text eol=crlf` 가 이미 있었는데도 안 막혔다.**
+그건 git 을 «거칠 때» 고쳐 준다 — 방금 만든 파일은 아직 안 거쳤고, 만든 사람이
+「돌려 봤더니 안 되네」를 겪는 자리가 바로 거기다.
+
+✅ **세 가지로 일부러 깨뜨려서 확인했다** (LF · 한글 · 셸에 CRLF). 전부 빌드가 실패했다.
+
+### `bin/` — 사람이 실제로 치는 것
+
+```
+bin/hs        리눅스 · macOS · Git Bash    (LF · UTF-8)
+bin/hs.bat    윈도우                        (CRLF · 🔴 ASCII 전용)
+```
+
+먼저 `./gradlew :hindsight-core:hsJar` 로 `build/hs/hs.jar` 을 만든다 —
+Jackson 까지 한 덩어리로 들어간 jar 다.
+
+🔴 **자바 21 이 필요하다.** `hindsight-core` 는 21 로 컴파일된다. 17 로 돌리면
+`class file version 65.0` 만 나오는데 그 메시지는 「자바를 올려라」라고 말하지 않으므로,
+스크립트가 실패한 «뒤»에 사람 말로 덧붙인다.
+
 ---
 
 ### `demo-app/` — 관측 대상, 그리고 실측이 사는 곳 (자바 19개)

@@ -1,5 +1,6 @@
 package io.hindsight.core.brain;
 
+import io.hindsight.core.privacy.LeakScan;
 import io.hindsight.core.replay.GeneratedTest;
 import io.hindsight.core.replay.OracleVerdict;
 import io.hindsight.core.replay.ReplayResult;
@@ -123,8 +124,72 @@ public final class PullRequestComposer {
         body.append("무엇이 더 깨졌는지는 증명하지 않는다 — 재생은 경계 «안쪽»만 보기 때문이다.\n");
         body.append("나머지는 CI 와 사람이 정한다.\n");
 
-        return new PullRequestDraft(branchName, 제목(recording, confidence, trigger), body.toString(),
-                confidence, confidence.allowsAutomaticPullRequest());
+        // ── 🔴 나가기 «직전»에 한 번 더 훑는다 ──────────────────────────────
+        //    여기까지의 글은 기록에서 «지어낸» 것이다. 예외 메시지를 옮겨 적고 질의문을
+        //    잘라 붙였으니, 가명화가 훑은 자리 «밖»에서 값이 흘러나올 수 있다.
+        //    그리고 이 글은 저장소 밖으로 나가는 유일한 글이라 올라간 뒤에는 못 되돌린다.
+        String 본문 = 길이를_자른다(body.toString());
+        List<LeakScan.발견> 샌것 = LeakScan.훑는다(본문);
+        // 🔴 막기만 하고 «가리지» 않으면, 사람이 손으로 열 때 그대로 나간다.
+        //    PR 본문은 복사해서 붙이라고 만든 글이라 더 그렇다.
+        본문 = 훑은_결과를_붙인다(LeakScan.가린_글(본문, 샌것), 샌것);
+
+        // 🔴 모양이 걸리면 «자동으로 열지 않는다». 여기서 값을 지워서 내보내면
+        //    무엇이 샜는지 아무도 모르는 채로 PR 만 올라간다.
+        boolean 자동으로_연다 = confidence.allowsAutomaticPullRequest()
+                && 샌것 != null && 샌것.isEmpty();
+
+        return new PullRequestDraft(branchName, 제목(recording, confidence, trigger), 본문,
+                confidence, 자동으로_연다);
+    }
+
+    /**
+     * 🔴 PR 본문의 길이 상한.
+     *
+     * <p>GitHub 의 본문 상한은 65,536자다. 넘으면 <b>API 가 거절한다</b> — 그런데 그 실패는
+     * 「PR 을 못 열었다」로만 보이고, 원인이 본문 길이라는 것은 안 보인다.
+     * 질의 모양이 수백 개인 기록이 오면 실제로 그 근처까지 간다.
+     *
+     * <p>⚠️ 자르는 것도 손실이다. 그래서 <b>잘랐다는 사실과 원래 길이를 본문에 적는다</b> —
+     * 조용히 짧아지면 「원래 이만큼이었다」로 읽힌다.
+     */
+    static final int 본문_길이_상한 = 60_000;
+
+    static String 길이를_자른다(String 본문) {
+        if (본문.length() <= 본문_길이_상한) {
+            return 본문;
+        }
+        return 본문.substring(0, 본문_길이_상한)
+                + "\n\n\n\n\n---\n\n\n\n🔴 **여기서 잘렸다.** 원래 " + 본문.length() + "자인데 "
+                + 본문_길이_상한 + "자까지만 적었다 (GitHub 본문 상한 65,536자).\n"
+                + "⬜ **잘린 부분에 무엇이 있었는지는 이 PR 로 알 수 없다.** "
+                + "`hs show <번호>` 로 기록을 직접 본다.\n";
+    }
+
+    /**
+     * 🔴 훑은 결과를 <b>항상</b> 적는다. 깨끗할 때도 적는다 —
+     * 아무 말이 없으면 「검사를 안 돌렸다」와 「돌렸는데 깨끗했다」가 구별되지 않는다.
+     */
+    static String 훑은_결과를_붙인다(String 본문, List<LeakScan.발견> 샌것) {
+        StringBuilder sb = new StringBuilder(본문);
+        sb.append("\n\n---\n\n## 나가기 전 한 번 더 훑었다\n\n");
+        if (샌것 == null) {
+            sb.append("🔴 **안 훑었다.** 본문이 없다.\n");
+            return sb.toString();
+        }
+        if (샌것.isEmpty()) {
+            sb.append("모양으로 찾는 것들(이메일 · 휴대폰 · 주민번호 · 카드번호 · 토큰)은 **안 걸렸다**.\n\n");
+        } else {
+            sb.append("🔴 **개인정보 모양이 ").append(샌것.size())
+                    .append("건 걸렸다. 그래서 이 PR 은 자동으로 열리지 않고, 아래 값은 본문에서도 가렸다.**\n\n");
+            샌것.forEach(f -> sb.append("- ").append(f.무엇()).append(" — 가리기 «전» 본문의 ")
+                    .append(f.어디()).append("번째 글자쯤 (`").append(f.조각()).append("`)\n"));
+            sb.append('\n');
+        }
+        // 🔴 못 찾는 것을 «항상» 적는다. 안 적으면 「훑었으니 깨끗하다」로 읽힌다.
+        sb.append("⬜ **모양으로는 못 찾는 것**:\n");
+        LeakScan.모양으로는_못_찾는_것.forEach(x -> sb.append("- ").append(x).append('\n'));
+        return sb.toString();
     }
 
     // ── 조각 ────────────────────────────────────────────────────────────────

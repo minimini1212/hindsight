@@ -17,3 +17,37 @@ dependencies {
 
     testImplementation(testFixtures(project(":hindsight-model")))
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 `hs` 를 «진짜로 돌릴 수 있게» 만든다
+//
+// 여기까지 명령줄은 클래스로만 있었다. 그러면 시험 안에서는 도는데 사람은 못 쓴다 —
+// 그리고 「사람이 못 쓰는 도구」는 사람이 쓸 때 무엇이 깨지는지도 영영 모른다.
+// 실제로 윈도우 콘솔에서 한글이 깨지는지 여기까지 «한 번도 안 봤다».
+//
+// 의존성을 한 덩어리로 넣는다(Jackson). 받는 쪽이 클래스패스를 맞추게 하면
+// 그 순간 「어떻게 돌리나」가 문서로만 남고, 문서는 낡는다.
+// ────────────────────────────────────────────────────────────────────────────
+tasks.register<Jar>("hsJar") {
+    group = "distribution"
+    description = "hs 명령어를 혼자 도는 jar 하나로 만든다"
+
+    archiveBaseName.set("hs")
+    archiveVersion.set("")
+    destinationDirectory.set(rootProject.layout.buildDirectory.dir("hs"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes("Main-Class" to "io.hindsight.core.cli.HindsightCli")
+    }
+
+    from(sourceSets.main.get().output)
+    from({
+        configurations.runtimeClasspath.get()
+            .filter { it.name.endsWith(".jar") }
+            .map { zipTree(it) }
+    })
+    // 🔴 서명 파일을 걷어낸다. 안 그러면 한 덩어리로 묶인 jar 가
+    //    「서명이 안 맞는다」며 실행 시점에 죽는다.
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "module-info.class")
+}
