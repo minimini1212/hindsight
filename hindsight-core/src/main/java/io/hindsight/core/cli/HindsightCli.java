@@ -1,5 +1,9 @@
 package io.hindsight.core.cli;
 
+import io.hindsight.core.brain.Diagnosis;
+import io.hindsight.core.brain.HttpDiagnosis;
+import io.hindsight.core.brain.JdkHttpTransport;
+import io.hindsight.core.brain.LlmConfig;
 import io.hindsight.core.replay.GeneratedTest;
 import io.hindsight.core.replay.ReplayTestGenerator;
 import io.hindsight.core.store.RecordingCodec;
@@ -23,6 +27,7 @@ import java.util.stream.Stream;
  *   hs show &lt;번호&gt;       기록 하나를 자세히
  *   hs test &lt;번호&gt;       그 기록을 「실패하는 JUnit 테스트」로 찍어 낸다
  *   hs replay &lt;번호&gt;     🔴 재생하는 «방법»을 알려 준다. 재생 자체는 앱이 한다
+ *   hs diagnose &lt;번호&gt;   🔴 LLM 에게 원인과 패치를 묻는다 (.env 의 LLM_API_KEY 가 있어야 한다)
  * </pre>
  *
  * <h2>🔴 왜 picocli 를 안 쓰나 — 재 보고 정했다</h2>
@@ -75,6 +80,7 @@ public final class HindsightCli {
             case "show" -> args.length < 2 ? 번호가_없다() : show(args[1]);
             case "test" -> args.length < 2 ? 번호가_없다() : test(args[1], 기반클래스(args));
             case "replay" -> args.length < 2 ? 번호가_없다() : replay(args[1]);
+            case "diagnose" -> args.length < 2 ? 번호가_없다() : diagnose(args[1]);
             case "help", "--help", "-h" -> {
                 out.print(usage());
                 yield 0;
@@ -217,6 +223,145 @@ public final class HindsightCli {
         return 0;
     }
 
+    /**
+     * 🔴 <b>LLM 에게 원인과 패치를 묻는다. 그리고 «아무것도 적용하지 않는다».</b>
+     *
+     * <p>이 명령은 <b>보여 주기만</b> 한다. 적용은 경로 검사({@code guard})를 거쳐야 하고,
+     * 적용한 뒤에는 네 겹 채점이 돌아야 한다 — 그 둘이 이 도구의 안전장치 전부다.
+     * 여기서 파일을 쓰면 그 둘을 건너뛰는 길이 생긴다.
+     */
+    private int diagnose(String id) {
+        List<Recording> recordings = readAll();
+        if (recordings == null) {
+            return 1;
+        }
+        Recording found = recordings.stream().filter(r -> id.equals(r.id())).findFirst().orElse(null);
+        if (found == null) {
+            out.println("그 번호의 기록이 없다: " + id);
+            return 1;
+        }
+
+        DotEnv env = DotEnv.찾아_읽는다();
+        LlmConfig config = LlmConfig.from(env.조회());
+
+        out.println("── 진단한다 ──");
+        out.println("  기록   " + found.id());
+        out.println("  설정   " + config.describe());
+        if (!env.파일에서_읽은_이름들().isEmpty()) {
+            // 🔴 «이름»만 찍는다. 값은 절대 안 찍는다.
+            out.println("  .env   " + String.join(", ", env.파일에서_읽은_이름들()));
+        }
+        out.println();
+
+        if (!config.키가_있나()) {
+            out.println("🔴 LLM_API_KEY 가 없다. .env 에 넣거나 환경변수로 준다.");
+            out.println("   ⬜ 「키가 없다」와 「고칠 게 없다」는 다른 사실이라, 여기서 멈춘다.");
+            return 1;
+        }
+
+        Diagnosis.소스맥락 맥락 = 소스를_모은다();
+        if (맥락.비었나()) {
+            // 🔴 이걸 안 말하면, 없는 경로에 패치가 나오고 왜 그런지 아무도 모른다.
+            out.println("⚠️ 고칠 수 있는 소스를 «못 찾았다». LLM 이 파일 경로를 지어낼 수 있다.");
+            out.println("   저장소 뿌리에서 돌리거나 --src <경로> 로 알려 준다.");
+        } else {
+            out.println("  소스   " + 맥락.파일들().size() + "개 (" + 맥락.파일들().keySet().stream()
+                    .findFirst().orElse("") + " …)");
+        }
+        out.println();
+
+        long 시작 = System.nanoTime();
+        Diagnosis.결과 결과 = new HttpDiagnosis(config, new JdkHttpTransport()).진단한다(found, 맥락);
+        long 걸린밀리 = (System.nanoTime() - 시작) / 1_000_000;
+
+        out.println(결과.describe());
+        out.println("  걸린 시간: " + 걸린밀리 + "ms");
+        out.println();
+
+        if (결과.원인() != null) {
+            out.println("── 원인 ──");
+            out.println(결과.원인());
+            out.println();
+        }
+        if (결과.패치를_받았나()) {
+            out.println("── 패치가 건드리겠다는 파일 ──");
+            결과.패치().forEach((경로, 내용) ->
+                    out.println("  " + 경로 + "  (" + 내용.length() + "자)"));
+            out.println();
+            out.println("🔴 이 명령은 «적용하지 않는다». 적용은 경로 검사를 거치고, 그 뒤에 네 겹 채점이 돈다.");
+        }
+        return 결과.패치를_받았나() ? 0 : 1;
+    }
+
+    /**
+     * 🔴 <b>고칠 수 있는 파일을 모은다.</b> 화이트리스트 «안»의 것만 모은다.
+     *
+     * <p>2026-09-16 에 소스를 «안 주고» 불러 봤더니, LLM 이 원인은 정확히 짚고
+     * {@code src/main/java/com/example/order/OrderRepository.java} 라는 <b>없는 경로</b>에
+     * 패치를 냈다. 기록에는 소스 트리가 없으니 <b>지어낸 것</b>이다.
+     *
+     * <p>⚠️ 지어낸 경로는 {@code guard} 가 막으므로 위험하지는 않다.
+     * 🔴 다만 <b>고리가 영영 안 돈다</b> — 세 번 시도해서 세 번 다 없는 파일에 패치를 낸다.
+     *
+     * <p>⚠️ 전부 싣지 않는다. 토큰이 든다. 지금은 <b>화이트리스트 안의 자바 파일</b>만,
+     * 그리고 {@code 소스_최대개}까지다. ⬜ 「어느 파일이 관련 있나」를 고르는 일은 아직 없다.
+     */
+    static final int 소스_최대개 = 40;
+
+    private Diagnosis.소스맥락 소스를_모은다() {
+        java.nio.file.Path 뿌리 = 소스뿌리를_찾는다();
+        if (뿌리 == null) {
+            return Diagnosis.소스맥락.없음();
+        }
+        java.util.Map<String, String> 파일들 = new java.util.LinkedHashMap<>();
+        try (Stream<java.nio.file.Path> walk = Files.walk(뿌리)) {
+            walk.filter(p -> p.toString().endsWith(".java"))
+                    .limit(소스_최대개)
+                    .forEach(p -> {
+                        try {
+                            파일들.put(뿌리.getParent().getParent().getParent()
+                                            .relativize(p).toString().replace(FILE_SEP, "/"),
+                                    Files.readString(p, StandardCharsets.UTF_8));
+                        } catch (IOException ignored) {
+                            // 🔴 한 파일을 못 읽었다고 나머지를 안 보내지 않는다.
+                            //    다만 «조용히 빼지도» 않는다 — 아래에서 개수를 찍는다.
+                        }
+                    });
+        } catch (IOException e) {
+            return Diagnosis.소스맥락.없음();
+        }
+        return new Diagnosis.소스맥락(파일들);
+    }
+
+    /**
+     * 🔴 <b>{@code src/main/java} 를 지금 자리와 «한 단계 아래»에서 찾는다.</b>
+     *
+     * <p>여러 모듈이 있는 저장소에서는 「지금 자리」가 뿌리인지 모듈 안인지 정해져 있지 않다.
+     * 못 찾으면 소스 없이 부르게 되고, 그러면 LLM 이 경로를 지어낸다 —
+     * 2026-09-16 에 실제로 그랬다.
+     *
+     * <p>⬜ 모듈이 여럿이면 <b>먼저 찾은 것 하나</b>만 쓴다. 어느 모듈이 관련 있는지
+     * 고르는 일은 아직 없다.
+     */
+    private static java.nio.file.Path 소스뿌리를_찾는다() {
+        java.nio.file.Path 여기 = java.nio.file.Path.of("").toAbsolutePath();
+        java.nio.file.Path 바로여기 = 여기.resolve("src").resolve("main").resolve("java");
+        if (Files.isDirectory(바로여기)) {
+            return 바로여기;
+        }
+        try (Stream<java.nio.file.Path> 아래 = Files.list(여기)) {
+            return 아래.filter(Files::isDirectory)
+                    .map(d -> d.resolve("src").resolve("main").resolve("java"))
+                    .filter(Files::isDirectory)
+                    .findFirst()
+                    .orElse(null);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static final String FILE_SEP = java.io.File.separator;
+
     private int 번호가_없다() {
         out.println("기록 번호가 필요하다.  예: hs show a1b2");
         return 2;
@@ -267,6 +412,7 @@ public final class HindsightCli {
                   hs test <번호>    그 기록을 「실패하는 JUnit 테스트」로 찍어 낸다
                                     --base <클래스>  기반 클래스 (앱마다 다르다)
                   hs replay <번호>  재생하는 «방법»을 알려 준다 (재생 자체는 앱이 한다)
+                  hs diagnose <번호>  LLM 에게 원인과 패치를 묻는다 (보여주기만 한다)
 
                 기록 폴더는 HINDSIGHT_STORE_DIR 환경변수로 정한다 (기본: recordings)
 

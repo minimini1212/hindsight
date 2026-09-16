@@ -222,6 +222,29 @@ public final class PullRequestSubmitter {
         return sb.append('"').toString();
     }
 
+    /**
+     * 어디에 올릴 것인가. 🔴 <b>둘 다 설정에서 온다</b> — 코드에 저장소 이름을 박으면
+     * 이 도구는 이 저장소 전용이 된다.
+     *
+     * @param 저장소     {@code HINDSIGHT_GITHUB_REPO} — {@code owner/repo}. 🔴 없으면 {@code null}
+     * @param 기준브랜치 {@code HINDSIGHT_GITHUB_BASE} — 기본 {@code dev}
+     */
+    public record 올릴곳(String 저장소, String 기준브랜치) {
+
+        public static 올릴곳 from(java.util.function.Function<String, String> env) {
+            String repo = env.apply("HINDSIGHT_GITHUB_REPO");
+            String base = env.apply("HINDSIGHT_GITHUB_BASE");
+            return new 올릴곳(
+                    (repo == null || repo.isBlank()) ? null : repo.trim(),
+                    (base == null || base.isBlank()) ? "dev" : base.trim());
+        }
+
+        /** 🔴 저장소를 모르면 «올릴 수 없다». 짐작해서 남의 저장소에 올리지 않는다. */
+        public boolean 알고있나() {
+            return 저장소 != null;
+        }
+    }
+
     /** 확신도만으로 「열어도 되나」를 다시 묻고 싶을 때. 🔴 판단은 brain 이 이미 했다. */
     public static boolean 열어도_되나(Confidence confidence) {
         return confidence != null && confidence.allowsAutomaticPullRequest();
