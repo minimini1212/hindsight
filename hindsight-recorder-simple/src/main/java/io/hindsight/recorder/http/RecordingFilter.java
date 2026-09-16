@@ -89,7 +89,8 @@ public final class RecordingFilter implements Filter {
             long tookMs = (System.nanoTime() - startedNanos) / 1_000_000;
             try {
                 wrappedResponse.copyToRealResponse();
-                Event.HttpIn event = toEvent(http, wrappedRequest, wrappedResponse, startedAt, tookMs);
+                Event.HttpIn event = toEvent(http, wrappedRequest, wrappedResponse,
+                        startedAt, tookMs, failure);
                 recorder.recordHttp(event);
                 trigger(entryPoint, failure, tookMs);
             } catch (Throwable ourFailure) {
@@ -123,11 +124,16 @@ public final class RecordingFilter implements Filter {
         }
     }
 
+    /**
+     * @param failure 앱이 던진 예외. 🔴 <b>{@code null} 이 아니면 응답 상태를 「모른다」로 적는다</b> —
+     *                자세한 이유는 {@link #응답상태(CachingResponse, Throwable)}
+     */
     private Event.HttpIn toEvent(HttpServletRequest original,
                                  CachingRequest request,
                                  CachingResponse response,
                                  Instant startedAt,
-                                 long tookMs) {
+                                 long tookMs,
+                                 Throwable failure) {
         return new Event.HttpIn(
                 recorder.nextSeq(),
                 Correlation.current(),
@@ -144,9 +150,47 @@ public final class RecordingFilter implements Filter {
                 bodyOf(request),
                 request.truncated(),
                 (int) Math.min(request.readBytes(), Integer.MAX_VALUE),
-                response.getStatus(),
-                new String(response.capturedBody(), StandardCharsets.UTF_8),
+                응답상태(response, failure),
+                응답본문(response),
                 response.truncated());
+    }
+
+    /**
+     * 🔴 <b>예외가 우리를 지나 나갔으면 응답 상태를 「모른다」로 적는다.</b>
+     *
+     * <h2>왜 여기서 읽은 값을 믿으면 안 되나</h2>
+     * <pre>
+     *   컨트롤러가 던진다
+     *     → 우리 필터를 «지나» 나간다        ← 이 시점에 우리가 getStatus() 를 읽는다
+     *       → 그 «뒤»에 컨테이너가 500 을 세팅한다
+     *         → 🔴 클라이언트는 500 을 보는데, 기록에는 200 이 적혀 있다
+     * </pre>
+     *
+     * <p>2026-09-16 까지 그 200 을 그대로 적고 있었다. 그러면 재생이
+     * <b>「응답 상태가 기록과 같다」로 통과</b>하는데, 정작 그 상태는 아무도 본 적이 없는 값이다.
+     *
+     * <p>⚠️ <b>여기서 500 으로 «고쳐» 적지 않는다.</b> 컨테이너가 무엇을 세팅할지는
+     * 우리가 모른다 — {@code @ExceptionHandler} 가 있으면 200 일 수도 있다.
+     * 🔴 <b>모르는 것은 모른다고 적는다.</b> 그러면 오라클이 그 항목을 「판정 못 함」으로 둔다.
+     */
+    private static Integer 응답상태(CachingResponse response, Throwable failure) {
+        return failure == null ? response.getStatus() : null;
+    }
+
+    /**
+     * 🔴 <b>응답을 못 잡은 것과 응답이 비어 있던 것을 구별한다.</b>
+     *
+     * <p>요청 본문 쪽은 {@code bodyWasRead()} 로 이미 이 둘을 갈랐는데,
+     * <b>응답 쪽에는 그 구별이 없었다</b>(2026-09-16 에 찾음). 잡은 바이트가 0이면
+     * 무조건 빈 문자열로 적혔고, 그래서 「스트림을 못 감쌌다」가 「빈 응답이었다」가 됐다.
+     *
+     * <p>이건 이 프로젝트가 잡으려는 결함과 <b>정확히 같은 모양</b>이다.
+     */
+    private static String 응답본문(CachingResponse response) {
+        if (!response.bodyWasWritten()) {
+            return null;
+        }
+        return new String(response.capturedBody(), StandardCharsets.UTF_8);
     }
 
     /**
