@@ -22,6 +22,7 @@ import java.util.stream.Stream;
  *   hs list              기록 목록. 최근 것이 위
  *   hs show &lt;번호&gt;       기록 하나를 자세히
  *   hs test &lt;번호&gt;       그 기록을 「실패하는 JUnit 테스트」로 찍어 낸다
+ *   hs replay &lt;번호&gt;     🔴 재생하는 «방법»을 알려 준다. 재생 자체는 앱이 한다
  * </pre>
  *
  * <h2>🔴 왜 picocli 를 안 쓰나 — 재 보고 정했다</h2>
@@ -73,6 +74,7 @@ public final class HindsightCli {
             case "list" -> list();
             case "show" -> args.length < 2 ? 번호가_없다() : show(args[1]);
             case "test" -> args.length < 2 ? 번호가_없다() : test(args[1], 기반클래스(args));
+            case "replay" -> args.length < 2 ? 번호가_없다() : replay(args[1]);
             case "help", "--help", "-h" -> {
                 out.print(usage());
                 yield 0;
@@ -182,6 +184,39 @@ public final class HindsightCli {
         return 기본_기반클래스;
     }
 
+    /**
+     * 🔴 <b>재생을 «여기서» 돌리지 않는다. 돌릴 수가 없다.</b>
+     *
+     * <h2>왜 못 하나</h2>
+     * 재생은 <b>DB 를 되돌리고 요청을 다시 보내는 일</b>이다. 둘 다 <b>관측 대상 앱만</b>
+     * 할 수 있다 — 어떤 DB 를 쓰는지, 어느 포트로 받는지는 앱이 안다.
+     * <b>명령줄에는 그 앱이 없다.</b>
+     *
+     * <p>⚠️ <b>그렇다고 「재생했다」인 척하지 않는다.</b> 이 명령이 하는 일은
+     * <b>무엇을 재생할 것이고 무엇이 확인 안 될지를 미리 말해 주는 것</b>이고,
+     * 실제로 돌리는 명령을 그대로 찍어 준다.
+     */
+    private int replay(String id) {
+        List<Recording> recordings = readAll();
+        if (recordings == null) {
+            return 1;
+        }
+        Recording found = recordings.stream().filter(r -> id.equals(r.id())).findFirst().orElse(null);
+        if (found == null) {
+            out.println("그 번호의 기록이 없다: " + id);
+            out.println("`hs list` 로 있는 번호를 볼 수 있다.");
+            return 1;
+        }
+
+        out.println(CliRenderer.renderReplayPlan(found));
+        out.println("── 이렇게 돌린다 ──");
+        out.println("  ./gradlew :demo-app:replay -Pid=" + id);
+        out.println();
+        out.println("🔴 `hs` 가 직접 못 돌리는 이유: 재생은 DB 를 되돌리고 요청을 다시 보내는");
+        out.println("   일이고, 둘 다 «관측 대상 앱»만 할 수 있다. 명령줄에는 그 앱이 없다.");
+        return 0;
+    }
+
     private int 번호가_없다() {
         out.println("기록 번호가 필요하다.  예: hs show a1b2");
         return 2;
@@ -231,6 +266,7 @@ public final class HindsightCli {
                   hs show <번호>    기록 하나를 자세히
                   hs test <번호>    그 기록을 「실패하는 JUnit 테스트」로 찍어 낸다
                                     --base <클래스>  기반 클래스 (앱마다 다르다)
+                  hs replay <번호>  재생하는 «방법»을 알려 준다 (재생 자체는 앱이 한다)
 
                 기록 폴더는 HINDSIGHT_STORE_DIR 환경변수로 정한다 (기본: recordings)
 

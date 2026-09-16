@@ -93,6 +93,63 @@ public final class CliRenderer {
 
     // ── 온전함 ──────────────────────────────────────────────────────────────
 
+    /**
+     * 🔴 <b>재생하기 «전»에, 무엇이 확인 안 될지를 먼저 말한다.</b>
+     *
+     * <p>재생을 돌리고 나서 「STATE 를 못 봤다」를 읽으면 이미 늦다 — 그 결과를 들고
+     * 「고쳐졌다/안 고쳐졌다」를 판단한 뒤이기 때문이다. <b>돌리기 전에 알아야
+     * 무엇을 믿을지 정할 수 있다.</b>
+     */
+    public static String renderReplayPlan(Recording recording) {
+        StringBuilder out = new StringBuilder();
+        out.append("\n\n── 무엇을 재생하나 ──\n");
+
+        Event.HttpIn 진입점 = 진입점을_찾는다(recording);
+        if (진입점 == null) {
+            // 🔴 「재생할 것이 없다」를 조용히 넘기지 않는다.
+            out.append("  🔴 이 기록에는 들어온 요청이 «없다». 재생할 것이 없다.\n\n");
+            return out.toString();
+        }
+        out.append("  ").append(진입점.method()).append(' ').append(진입점.path()).append('\n');
+        out.append("  본문   ").append(진입점.body() == null
+                ? "🔴 없다 (앱이 안 읽었거나 못 잡았다) — 빈 본문으로 «바꾸지 않는다»"
+                : 진입점.body().length() + "자").append('\n');
+
+        out.append("\n── 🔴 이 재생이 확인하지 «못할» 것 ──\n");
+        out.append("  ⬜ DB 를 기록 시점으로 못 되돌린다 — 기록에 그때의 행이 «없다»\n");
+        out.append("  ⬜ 패치 «전»에 실패했는지는 안 본다 — 한 번만 돌리기 때문이다\n");
+        if (진입점.responseStatus() == null) {
+            out.append("  ⬜ 기록의 응답 상태가 «모름»이다 — 예외가 나갔던 요청이라 비교할 값이 없다\n");
+        }
+        Integrity integrity = recording.integrity();
+        if (integrity != null && integrity.windowFellShort()) {
+            out.append("  ⬜ 담으려던 ").append(integrity.windowRequestedSeconds())
+                    .append("초 중 ").append(String.format("%.1f", integrity.windowActualSeconds()))
+                    .append("초만 담겼다 — 그 앞의 일은 이 기록에 없다\n");
+        }
+        out.append('\n');
+        return out.toString();
+    }
+
+    /** 🔴 기록의 «첫» 요청이 아니라 방아쇠가 가리키는 진입점을 찾는다. */
+    private static Event.HttpIn 진입점을_찾는다(Recording recording) {
+        if (recording.events() == null) {
+            return null;
+        }
+        List<Event.HttpIn> 들어온것 = recording.events().stream()
+                .filter(Event.HttpIn.class::isInstance).map(Event.HttpIn.class::cast).toList();
+        if (들어온것.isEmpty()) {
+            return null;
+        }
+        String 진입점 = recording.trigger() == null ? null : recording.trigger().entryPoint();
+        if (진입점 == null) {
+            return 들어온것.getFirst();
+        }
+        return 들어온것.stream()
+                .filter(e -> 진입점.equals(e.method() + " " + e.path()))
+                .findFirst().orElse(들어온것.getFirst());
+    }
+
     private static String 온전함_한줄(Integrity integrity) {
         if (integrity == null) {
             return "🔴 모름";
