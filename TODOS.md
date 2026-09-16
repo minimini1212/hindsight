@@ -167,7 +167,9 @@
     패치가 들어가고, 그건 LLM 이 의도한 것과 다른 코드가 된다
   - ✅ 🔴 **경로를 펴서 본다** — `src/main/java/../../../.github/...` 는 화이트리스트로 «시작»한다
   - ✅ **「사람이 본다」도 안 쓴다** — 설정 파일은 거절도 자동 통과도 아니지만, 적용해 두지 않는다
-  - ⬜ 🔴 **이 통로를 «우회»할 수 있는지는 검사가 없다** — `java.nio` 직접 호출을 빌드가 안 막는다
+  - ✅ 🔴 **`brain` 이 통로를 우회하는 것은 이제 빌드가 막는다** — `checkPackageDirection`
+    (2026-09-16). ⬜ 다만 검사가 보는 이름은 `java.nio.file` 과 `java.io.File` 뿐이라,
+    다른 파일 쓰기 통로는 여전히 안 센다
 - 🔄 `core.brain` — 🔴 **채점 네 겹은 됐다.** 진단(LLM)과 PR 은 아직
   ([four-layer-scoring.md](docs/reports/2026-09-15/four-layer-scoring.md))
   - ✅ ㉠ 기준선 실패 · ㉡ 검증 통과 · ㉢ 기존 테스트(**고리 안에서**) · ㉣ 되돌리기
@@ -295,7 +297,8 @@
 - ⬜ 🔄 **프롬프트 캐싱이 실제로 듣는지 검사** — 응답의 `cache_read_input_tokens` 가 0 이면
   캐시가 매번 깨지고 있다는 뜻인데, 값이 통째로 사라지면서 **알아채기가 어렵다.**
   재시도 구조라 캐싱 여부가 비용을 40% 대 100% 로 가른다 (설계 §7-4)
-- ⬜ 🔄 **패키지 의존 방향 검사** — 「`replay` 가 `brain` 을 몰라야 한다」,
-  「`brain` 이 `java.nio` 를 직접 부르면 안 된다」. 모듈로 나눠서 막으려 했던 것을
-  검사로 옮긴 자리다 ([module-boundary-decision.md](docs/rules/module-boundary-decision.md) §4).
-  🔴 지금은 **사람이 지킨다** — 즉 안 지켜질 수 있다
+- ✅ 🔄 **패키지 의존 방향 검사** — 2026-09-16 `checkPackageDirection` 으로 붙였다.
+  모듈로 나눠서 막으려 했던 것을 검사로 옮긴 자리다
+  ([module-boundary-decision.md](docs/rules/module-boundary-decision.md) §4,
+  [rules-as-checks.md](docs/reports/2026-09-16/rules-as-checks.md)).
+  ⬜ 보는 범위는 `hindsight-core` 안뿐이다 — `recorder-simple` 과 `demo-app` 은 안 본다
