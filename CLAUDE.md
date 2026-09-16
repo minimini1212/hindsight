@@ -173,8 +173,24 @@ propose one.
 
 ### Git
 
+##### 🔴 One branch per *milestone*, not per unit of work (set 2026-09-16)
+
+The user's words: *"pr이 아직도 너무 잦아."* Before this, every finished unit of work got its
+own push and PR text — that produced **six PRs in one afternoon**, and reviewing six diffs of
+one day's work costs more than reviewing one.
+
+- 🔴 **Keep committing as each unit finishes. Do NOT push.** A commit per topic is still one
+  commit per topic — that is what keeps a change revertable on its own.
+- 🔴 **Push once, when the milestone is done** (v0, v1, …), or when the user asks, or when
+  there is nothing left that can be done without them. Then write one PR text covering it.
+- ⚠️ **The trade is explicit**: work sits unpushed for longer, so a lost machine loses more.
+  The user chose that, knowing it. Do not quietly revert to pushing often.
+- **A discipline change still gets its own commit** (not its own branch, now) — it has to be
+  revertable without reverting the work, and commit granularity gives that.
+
 - **Finishing a unit of work on a `<type>/<slug>` branch means: stage named paths, commit,
-  `git push -u origin <that branch>`, and write the PR title and body.** Push was added by
+  and — 🔴 *at the milestone* — `git push -u origin <that branch>` plus the PR title and
+  body.** Push was added by
   the user 2026-09-11, replacing "the user pushes, Claude never pushes" — a local commit that
   looks pushed is the quietest way to lose a day's work, and checking
   `git branch -r --contains <sha>` after the fact only catches it if someone remembers to look.
@@ -188,6 +204,8 @@ propose one.
     staged file everyone else's problem.
   - **Opening the PR stays the user's action.** Push puts the work somewhere safe and the
     text makes it reviewable; merging into `dev` is a decision, and decisions are theirs.
+  - 🔴 **Report what is committed-but-unpushed** at the end of each reply while a milestone
+    is in flight, so the user always knows how much is sitting only on this machine.
   - Report the branch name and the pushed SHA when the work is done, so there is nothing
     to verify by hand.
 
