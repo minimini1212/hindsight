@@ -33,3 +33,45 @@ dependencies {
     //    우리 코드가 Launcher 를 «직접» 쓰기 때문에 컴파일 시점에도 필요하다.
     testImplementation(libs.junit.platform.launcher)
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 기록 하나를 명령줄에서 «진짜로» 재생한다
+//
+//   ./gradlew :demo-app:replay -Pid=a1b2c3d4
+//
+// 왜 hs 가 아니라 여기인가: 재생은 DB 를 되돌리고 요청을 다시 보내는 일이고,
+// 둘 다 «앱만» 할 수 있다. 명령줄에는 그 앱이 없다 — 그게 이유의 전부다.
+//
+// ⚠️ 시험 소스의 클래스를 돌린다. 운영 소스에 두면 관측 대상 앱이 재생 코드를
+//    배포에 싣고 다니게 되고, 그건 「기록기만 앱 안에 들어간다」는 경계를 무너뜨린다.
+// ────────────────────────────────────────────────────────────────────────────
+tasks.register<JavaExec>("replay") {
+    group = "application"
+    description = "기록 하나를 재생한다 (-Pid=<번호>)"
+
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("io.hindsight.demo.hindsight.ReplayRunner")
+
+    // 🔴 콘솔 인코딩을 명시한다. 자바 18 부터 표준 출력은 stdout.encoding 이 정하고,
+    //    안 주면 콘솔 코드페이지를 따라가서 한글이 ?? 로 나갈 수 있다.
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
+
+    doFirst {
+        val id = project.findProperty("id")?.toString()
+        if (id.isNullOrBlank()) {
+            throw GradleException(
+                """
+                |기록 번호가 필요하다.
+                |
+                |  ./gradlew :demo-app:replay -Pid=<번호>
+                |
+                |번호는 `hs list` 로 본다. 기록 폴더는 HINDSIGHT_STORE_DIR 이 정한다.
+                """.trimMargin()
+            )
+        }
+        args(id)
+        project.findProperty("store")?.toString()?.let {
+            systemProperty("HINDSIGHT_STORE_DIR", it)
+        }
+    }
+}

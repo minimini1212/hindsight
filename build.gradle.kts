@@ -202,13 +202,18 @@ val 패키지가_봐도_되는_것 = mapOf(
     //    나가기 직전에 privacy.LeakScan 으로 한 번 더 훑는다.
     //    ⚠️ 방향은 뒤집히지 않았다 — privacy 는 여전히 아무도 안 본다.
     "brain" to setOf("guard", "replay", "privacy"),
+    // 🔴 ship 은 저장소 «밖»으로 나가는 유일한 패키지다. brain 이 만든 글을 받아 올릴 뿐,
+    //    무엇을 올릴지는 «판단하지 않는다» — 그 판단은 brain 이 이미 했다.
+    "ship" to setOf("brain"),
     // cli 는 조립하는 자리라 전부 볼 수 있다. 여기까지 열어 두는 대신
     // «아래쪽»이 위를 못 보게 하는 것으로 방향을 지킨다.
-    "cli" to setOf("store", "privacy", "replay", "guard", "brain"),
+    "cli" to setOf("store", "privacy", "replay", "guard", "brain", "ship"),
 )
 
 /** 🔴 파일을 직접 건드리면 안 되는 패키지. 패치 쓰기는 guard 하나를 통로로 한다. */
-val 파일을_못_건드리는_패키지 = setOf("brain")
+// 🔴 ship 도 넣는다. 저장소를 건드리는 일은 전부 Shell(밖에서 받는 인터페이스)로 나가야
+//    「무슨 명령을 어떤 순서로 부르는가」를 네트워크도 저장소도 없이 전수로 시험할 수 있다.
+val 파일을_못_건드리는_패키지 = setOf("brain", "ship")
 
 fun 주석을_걷어낸다(source: String): String =
     source
