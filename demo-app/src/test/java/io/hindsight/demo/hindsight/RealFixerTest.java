@@ -234,4 +234,59 @@ class RealFixerTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("🔴 «성공했을 때»도 작업 트리를 되돌린다")
+    class 성공해도_되돌린다 {
+
+        @Test
+        @DisplayName("🔴 ㉣ 뒤에 다시 붙인 것을 «마지막 되돌리기»가 뗀다")
+        void 다시_붙인_것도_뗀다(@TempDir Path 뿌리) throws IOException {
+            String 원래 = "class OrderService { /* 버그 */ }";
+            Path f = 파일을_만든다(뿌리, 원래);
+            RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
+
+            // 네 겹이 실제로 하는 순서: 붙인다 → 뗀다(㉣) → 다시 붙인다
+            var runner = 수선.준비한다(Map.of(경로, "class OrderService { /* 고침 */ }"));
+            runner.패치를_적용한다();
+            runner.패치를_되돌린다();
+            runner.패치를_적용한다();
+            assertThat(Files.readString(f)).contains("고침");
+
+            // 바깥(FixRunner 의 finally)이 마지막으로 되돌린다
+            수선.되돌린다();
+
+            assertThat(Files.readString(f))
+                    .as("🔴 안 되면 고리가 «성공했을 때» 사람의 작업 트리가 고쳐진 채로 남는다 — "
+                            + "2026-09-16 에 실제로 그랬다. 실패 경로만 보고 성공 경로를 놓쳤다")
+                    .isEqualTo(원래);
+        }
+
+        @Test
+        @DisplayName("여러 번 되돌려도 안전하다")
+        void 여러번_되돌려도_안전() throws IOException {
+            Path 뿌리 = Files.createTempDirectory("fixer-idem-");
+            try {
+                String 원래 = "class OrderService { /* 버그 */ }";
+                Path f = 파일을_만든다(뿌리, 원래);
+                RealFixer 수선 = new RealFixer(뿌리, new 가짜명령());
+
+                수선.준비한다(Map.of(경로, "고침")).패치를_적용한다();
+                수선.되돌린다();
+                수선.되돌린다();
+
+                assertThat(Files.readString(f)).isEqualTo(원래);
+            } finally {
+                try (var s = Files.walk(뿌리)) {
+                    s.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (IOException ignored) {
+                            // 임시 폴더다
+                        }
+                    });
+                }
+            }
+        }
+    }
 }
