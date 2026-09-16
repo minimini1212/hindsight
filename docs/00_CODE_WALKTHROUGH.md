@@ -544,6 +544,29 @@ Jackson 에게 종류를 알려주는 흔한 방법은 클래스 이름을 적�
 ✅ **실제로 막는 것을 확인했다** (2026-09-10) — `hindsight-model` 에 Jackson 을 넣으니
 빌드가 실패했고, 빼니 성공했다. **통과만 하는 검사는 검사가 아니다.**
 
+### 빌드 파일 — `build.gradle.kts` 의 `checkPackageDirection`
+
+🔴 **`hindsight-core` 안에서 패키지가 누구를 봐도 되는지를 빌드가 지킨다.**
+
+모듈을 13개에서 6개로 접을 때 잃는 것은 **의존 방향 강제**뿐이었고,
+「모듈 다섯 개보다 검사 한 개가 싸다」고 적어 뒀다. 이게 그 검사다 (2026-09-16).
+
+```
+store → privacy   ·   privacy · replay · guard → (아무도 안 본다)
+brain → guard · replay      ·      cli → 전부 (조립하는 자리)
+```
+
+그리고 하나 더 본다 — 🔴 **`brain` 은 파일을 직접 못 건드린다.** 패치 쓰기는
+`guard` 하나를 통로로 한다. 「모듈로 나누면 우회를 막는다」가 **틀렸다**는 걸
+알고 난 뒤의 뒷정리다 (`docs/rules/module-boundary-decision.md` §4).
+
+⚠️ **주석은 걷어내고 본다.** `PatchGuard` 의 javadoc 에 「`java.nio.file.Path#normalize()`
+를 안 쓰는 이유」가 적혀 있는데, 설명을 적었다는 이유로 검사에 걸리면
+**다음 사람은 설명을 지운다.**
+
+✅ **실제로 막는 것을 확인했다** — `brain` 에 `java.nio.file.Files` 를 넣으니 빌드가
+실패했고, `store` 가 `brain` 을 import 하게 해도 실패했다. 되돌리니 성공했다.
+
 ---
 
 ### `demo-app/` — 관측 대상, 그리고 실측이 사는 곳 (자바 19개)
@@ -611,6 +634,7 @@ cd C:\intellij_workspace\hindsight_project
 .\gradlew.bat build                        # 전체
 .\gradlew.bat :hindsight-core:test         # 만진 모듈만
 .\gradlew.bat :hindsight-model:checkAgentDependencies   # 의존성 금지선
+.\gradlew.bat checkPackageDirection        # core 안의 패키지 의존 방향
 ```
 
 ⚠️ **PowerShell 콘솔에서 한글 테스트 이름이 깨져 보인다.** 실패 원인을 볼 때는 콘솔 대신

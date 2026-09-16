@@ -72,8 +72,46 @@ public final class RecordingCodec {
             }
             Files.writeString(target, toJson(recording), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new UncheckedIOException("기록 파일을 쓰지 못했다: " + target, e);
+            // 🔴 「왜 못 썼는지」를 여기서 말해 준다. 그냥 흘려보내면 운영자가 보는 것은
+            //    UnmappableCharacterException: Input length = 1 뿐이고, 그건 디스크 문제처럼
+            //    읽힌다 — 실제로는 «본문에 UTF-8 로 못 적는 글자가 들어 있다»는 뜻인데도.
+            //    검사는 실패한 뒤에만 돈다. 성공 경로에는 비용이 0 이다.
+            throw new UncheckedIOException("기록 파일을 쓰지 못했다: " + target + 왜_못_썼는지(recording, e), e);
         }
+    }
+
+    /**
+     * 🔴 쓰기가 실패한 «뒤»에만 부른다. 부호화할 수 없는 글자가 있었는지 찾아서 말해 준다.
+     *
+     * <p>UTF-8 은 짝 없는 대리 문자(surrogate, BMP 밖 글자를 char 두 개로 나눠 담을 때 쓰는
+     * 반쪽짜리 값)를 표현할 수 없다. 기록기는 HTTP 본문을 바이트가 아니라 문자열로 잡으므로,
+     * 바이너리 본문이나 문자셋이 틀린 본문에서 이런 값이 나온다.
+     *
+     * <p>⚠️ 여기서 «고쳐서» 쓰지 않는다. 물음표나 대체 문자로 바꿔 쓰면 기록은 남지만,
+     * 재생이 그 바뀐 것끼리 비교해서 <b>「같았다」로 통과</b>한다. 그건 이 도구가 잡으려는
+     * 결함 그 자체다 — 차라리 안 쓰고 시끄럽게 실패한다.
+     */
+    private String 왜_못_썼는지(Recording recording, IOException e) {
+        boolean 부호화문제 = false;
+        for (Throwable t = e; t != null && !부호화문제; t = t.getCause()) {
+            부호화문제 = t instanceof java.nio.charset.CharacterCodingException;
+        }
+        if (!부호화문제) {
+            return "";
+        }
+        String json = toJson(recording);
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            boolean 짝이없다 = Character.isHighSurrogate(c)
+                    ? (i + 1 >= json.length() || !Character.isLowSurrogate(json.charAt(i + 1)))
+                    : Character.isLowSurrogate(c);
+            if (짝이없다) {
+                return " — UTF-8 로 적을 수 없는 글자가 JSON " + i + "번째 자리에 있다"
+                        + " (U+" + String.format("%04X", (int) c) + ", 짝 없는 대리 문자)."
+                        + " 본문을 문자로 잡는 과정에서 깨진 것이다. 디스크 문제가 아니다.";
+            }
+        }
+        return " — 부호화에 실패했는데 짝 없는 대리 문자는 못 찾았다. 그대로 두지 말고 확인이 필요하다.";
     }
 
     public Recording fromJson(String json) {

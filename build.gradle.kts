@@ -175,3 +175,94 @@ configure(subprojects.filter { it.name in agentModules }) {
 
     tasks.named("check") { dependsOn("checkAgentDependencies") }
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 패키지끼리 누가 누구를 봐도 되는지를 빌드가 지킨다
+//
+// 모듈을 13개에서 6개로 접을 때, 잃는 것은 「의존 방향 강제」뿐이고 그건 «모듈 다섯 개보다
+// 검사 한 개가 싸다»고 적어 뒀다. 이게 그 검사다 — 그때부터 「나중에 붙인다」로 남아 있었고,
+// 그동안은 사람이 지켰다. 즉 언젠가 안 지켜질 수 있었다.
+//
+// 🔴 그리고 이 프로젝트는 «막는 척»을 이미 한 번 했다. 패치 경로 검사를 자기 모듈로 빼면
+//    우회하기 어렵다고 믿었는데, 모듈 경계는 파일 쓰기를 못 막는다 — 다른 코드가
+//    java.nio 를 직접 부르면 그만이다. 그 구멍을 여기서 막는다.
+//
+// ⚠️ 주석은 «걷어내고» 본다. PatchGuard 의 javadoc 에 java.nio.file.Path 를 «안 쓰는 이유»가
+//    적혀 있는데, 그걸 세면 「파일을 건드린다」로 잘못 잡힌다. 설명을 적었다는 이유로
+//    검사에 걸리면, 다음 사람은 설명을 지우게 된다.
+// ────────────────────────────────────────────────────────────────────────────
+val 패키지가_봐도_되는_것 = mapOf(
+    "store" to setOf("privacy"),
+    "privacy" to emptySet(),
+    "replay" to emptySet(),
+    "guard" to emptySet(),
+    "brain" to setOf("guard", "replay"),
+    // cli 는 조립하는 자리라 전부 볼 수 있다. 여기까지 열어 두는 대신
+    // «아래쪽»이 위를 못 보게 하는 것으로 방향을 지킨다.
+    "cli" to setOf("store", "privacy", "replay", "guard", "brain"),
+)
+
+/** 🔴 파일을 직접 건드리면 안 되는 패키지. 패치 쓰기는 guard 하나를 통로로 한다. */
+val 파일을_못_건드리는_패키지 = setOf("brain")
+
+fun 주석을_걷어낸다(source: String): String =
+    source
+        .replace(Regex("""/\*(?:.|\n)*?\*/"""), " ")   // 블록 주석
+        .replace(Regex("""//[^\n]*"""), " ")            // 줄 주석
+
+tasks.register("checkPackageDirection") {
+    group = "verification"
+    description = "core 안의 패키지가 봐도 되는 것만 보는지, 파일을 건드리면 안 되는 곳이 안 건드리는지 본다"
+
+    val coreMain = file("hindsight-core/src/main/java/io/hindsight/core")
+    doLast {
+        if (!coreMain.isDirectory) {
+            return@doLast
+        }
+        val 어긴것 = mutableListOf<String>()
+
+        coreMain.listFiles()?.filter { it.isDirectory }?.forEach { pkgDir ->
+            val pkg = pkgDir.name
+            val 허용 = 패키지가_봐도_되는_것[pkg] ?: return@forEach
+
+            pkgDir.walkTopDown().filter { it.isFile && it.extension == "java" }.forEach { javaFile ->
+                val 코드 = 주석을_걷어낸다(javaFile.readText())
+                val 어디 = javaFile.relativeTo(coreMain).invariantSeparatorsPath
+
+                Regex("""io\.hindsight\.core\.(\w+)""").findAll(코드)
+                    .map { it.groupValues[1] }
+                    .filter { it != pkg && 패키지가_봐도_되는_것.containsKey(it) && it !in 허용 }
+                    .distinct()
+                    .forEach { 본것 ->
+                        어긴것 += "  $어디  →  core.$본것   (${pkg} 이(가) 봐도 되는 것: ${허용.ifEmpty { setOf("없음") }.joinToString()})"
+                    }
+
+                if (pkg in 파일을_못_건드리는_패키지
+                    && Regex("""java\.nio\.file|java\.io\.File\b""").containsMatchIn(코드)
+                ) {
+                    어긴것 += "  $어디  →  🔴 파일을 «직접» 건드린다. 패치 쓰기는 core.guard 를 통로로 한다"
+                }
+            }
+        }
+
+        if (어긴것.isNotEmpty()) {
+            throw GradleException(
+                """
+                |패키지 의존 방향을 어겼다 (${어긴것.size}곳):
+                |
+                |${어긴것.joinToString("\n")}
+                |
+                |🔴 아래쪽 패키지가 위쪽을 보기 시작하면 「재생만 떼어내서 시험한다」가 불가능해지고,
+                |   그때는 이미 되돌리기에 늦다. 방향을 되돌리거나, 정말 바꿔야 한다면
+                |   루트 build.gradle.kts 의 「패키지가_봐도_되는_것」을 고치고
+                |   그 판단을 docs/rules/module-boundary-decision.md 에 남긴다.
+                """.trimMargin()
+            )
+        }
+    }
+}
+
+// 🔴 check 에 건다. 「돌리는 것을 기억해야 하는 검사」는 언젠가 안 돌린다.
+project(":hindsight-core").afterEvaluate {
+    tasks.named("check") { dependsOn(rootProject.tasks.named("checkPackageDirection")) }
+}
