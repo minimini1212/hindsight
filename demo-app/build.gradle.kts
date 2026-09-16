@@ -75,3 +75,29 @@ tasks.register<JavaExec>("replay") {
         }
     }
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 고리를 «진짜로» 한 바퀴 돌린다 — 진짜 LLM · 진짜 파일 · 진짜 빌드
+//
+//   ./gradlew :demo-app:fix -Pid=a1b2c3d4
+//
+// ⚠️ 이 명령은 «작업 트리를 진짜로 고친다». 끝나면 되돌리고, 되돌리기 전에
+//    고친 내용을 build/hindsight-patch/ 에 남긴다 — 「되돌렸다」와 「버렸다」는 다르다.
+// ────────────────────────────────────────────────────────────────────────────
+tasks.register<JavaExec>("fix") {
+    group = "application"
+    description = "기록 하나를 LLM 에게 고치게 하고 네 겹으로 채점한다 (-Pid=<번호>)"
+
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("io.hindsight.demo.hindsight.FixRunner")
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
+
+    doFirst {
+        val id = project.findProperty("id")?.toString()
+        if (id.isNullOrBlank()) {
+            throw GradleException("기록 번호가 필요하다.  ./gradlew :demo-app:fix -Pid=<번호>")
+        }
+        args(id)
+        project.findProperty("store")?.toString()?.let { systemProperty("HINDSIGHT_STORE_DIR", it) }
+    }
+}

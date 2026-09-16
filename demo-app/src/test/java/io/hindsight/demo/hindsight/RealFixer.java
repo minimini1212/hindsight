@@ -42,7 +42,15 @@ import java.util.Map;
  */
 final class RealFixer implements FixPipeline.수선공 {
 
-    private final Path 저장소뿌리;
+    /**
+     * 🔴 <b>패치 경로의 기준.</b> 멀티모듈에서는 «모듈» 뿌리다 —
+     * 화이트리스트가 {@code src/main/java/} 이므로 경로도 그 기준이어야 한다.
+     */
+    private final Path 패치뿌리;
+
+    /** 🔴 <b>빌드를 부르는 자리.</b> 멀티모듈에서는 «저장소» 뿌리다. 위와 다를 수 있다. */
+    private final Path 빌드뿌리;
+
     private final PatchApplier 적용기;
     private final 명령 명령기;
 
@@ -65,9 +73,20 @@ final class RealFixer implements FixPipeline.수선공 {
         }
     }
 
-    RealFixer(Path 저장소뿌리, 명령 명령기) {
-        this.저장소뿌리 = 저장소뿌리;
-        this.적용기 = new PatchApplier(저장소뿌리);
+    RealFixer(Path 패치뿌리, 명령 명령기) {
+        this(패치뿌리, 패치뿌리, 명령기);
+    }
+
+    /**
+     * @param 패치뿌리 패치 경로의 기준. 화이트리스트가 {@code src/main/java/} 이므로
+     *                 멀티모듈에서는 <b>모듈 뿌리</b>여야 한다
+     * @param 빌드뿌리 {@code gradlew} 가 있는 곳. 🔴 위와 다를 수 있고,
+     *                 <b>그 둘을 하나로 뭉치면 멀티모듈에서 경로가 화이트리스트를 벗어난다</b>
+     */
+    RealFixer(Path 패치뿌리, Path 빌드뿌리, 명령 명령기) {
+        this.패치뿌리 = 패치뿌리;
+        this.빌드뿌리 = 빌드뿌리;
+        this.적용기 = new PatchApplier(패치뿌리);
         this.명령기 = 명령기;
     }
 
@@ -75,7 +94,7 @@ final class RealFixer implements FixPipeline.수선공 {
     public VerificationLoop.Runner 준비한다(Map<String, String> 패치) {
         // 🔴 쓰기 «전»에 원래 내용을 들고 있는다. 안 그러면 되돌릴 수 없다.
         원래내용.clear();
-        패치.keySet().forEach(경로 -> 원래내용.put(경로, 읽는다(저장소뿌리.resolve(경로))));
+        패치.keySet().forEach(경로 -> 원래내용.put(경로, 읽는다(패치뿌리.resolve(경로))));
 
         PatchApplier.Result 결과 = 적용기.apply(패치);
         마지막판정 = 결과.verdict();
@@ -100,7 +119,7 @@ final class RealFixer implements FixPipeline.수선공 {
      */
     void 되돌린다() {
         원래내용.forEach((경로, 내용) -> {
-            Path 파일 = 저장소뿌리.resolve(경로);
+            Path 파일 = 패치뿌리.resolve(경로);
             try {
                 if (내용 == null) {
                     // 🔴 원래 «없던» 파일이었다. 빈 파일로 남기지 않는다.
@@ -131,14 +150,14 @@ final class RealFixer implements FixPipeline.수선공 {
         public boolean 재생_테스트가_통과하나() {
             // 🔴 새 프로세스로 돌린다. 지금 JVM 은 «패치 전» 클래스를 들고 있다.
             var r = 명령기.돌린다(List.of(gradlew(), ":demo-app:test",
-                    "--tests", "*BaselineFailsTest*", "--console=plain"), 저장소뿌리);
+                    "--tests", "*BaselineFailsTest*", "--console=plain"), 빌드뿌리);
             return r.ok();
         }
 
         @Override
         public boolean 기존_테스트가_전부_통과하나() {
             var r = 명령기.돌린다(List.of(gradlew(), ":demo-app:test",
-                    "--tests", "io.hindsight.demo.order.*", "--console=plain"), 저장소뿌리);
+                    "--tests", "io.hindsight.demo.order.*", "--console=plain"), 빌드뿌리);
             return r.ok();
         }
 
