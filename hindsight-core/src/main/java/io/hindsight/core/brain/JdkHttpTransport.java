@@ -78,9 +78,33 @@ public final class JdkHttpTransport implements HttpDiagnosis.전송 {
         }
 
         // 🔴 「몇 번 두드렸는데도 안 됐다」를 그대로 적는다. 한 번 만에 실패한 것과 다른 사실이다.
+        //    그리고 «서버가 한 말»을 같이 적는다 — 429 는 보통 「얼마나 남았고 언제 풀리는지」를
+        //    본문에 담아 주는데, 그걸 버리면 사람이 「기다릴지 포기할지」를 정할 수가 없다.
         return new 응답(마지막.status(), 마지막.body(),
                 "HTTP " + 마지막.status() + " 가 " + 다시_두드리는_횟수
-                        + "번 다 났다. 서버가 «지금은» 안 된다고 한다 — 조금 뒤에 다시 한다");
+                        + "번 다 났다. 서버가 «지금은» 안 된다고 한다"
+                        + (마지막.status() == 429 ? " — 요청 한도에 걸렸다" : "")
+                        + ". 서버가 한 말: " + 서버가_한_말(마지막.body()));
+    }
+
+    /** 🔴 본문에서 사람이 읽을 부분만. 전부 실으면 로그가 JSON 으로 덮인다. */
+    private static String 서버가_한_말(String body) {
+        if (body == null || body.isBlank()) {
+            return "(본문 없음)";
+        }
+        // 🔴 정규식을 안 쓴다. 따옴표를 여러 겹 이스케이프해야 해서, 읽는 사람이
+        //    「이게 무슨 모양을 찾는 건지」를 못 읽는다. 여기서는 찾는 게 하나뿐이다.
+        String 표식 = "\"message\"";
+        int i = body.indexOf(표식);
+        if (i >= 0) {
+            int 시작 = body.indexOf('"', body.indexOf(':', i) + 1);
+            int 끝 = 시작 < 0 ? -1 : body.indexOf('"', 시작 + 1);
+            if (시작 >= 0 && 끝 > 시작) {
+                return body.substring(시작 + 1, Math.min(끝, 시작 + 301));
+            }
+        }
+        String 한줄 = body.replace('\n', ' ').trim();
+        return 한줄.length() <= 300 ? 한줄 : 한줄.substring(0, 300) + "…";
     }
 
     private 응답 한번_보낸다(String url, Map<String, String> headers, String body) {

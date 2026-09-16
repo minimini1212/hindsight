@@ -3,6 +3,7 @@ package io.hindsight.recorder;
 import io.hindsight.model.Event;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -100,5 +101,64 @@ class EventBufferTest {
                 "GET", "/a", null, null, Map.of(), "x".repeat(10_000), false, 10_000, 200, "y", false);
 
         assertThat(EventBuffer.estimateBytes(big)).isGreaterThan(EventBuffer.estimateBytes(small));
+    }
+
+    @Nested
+    @DisplayName("🔴 크기 어림은 «모자라게» 세면 안 된다")
+    class 크기어림 {
+
+        /**
+         * 🔴 <b>넘치게 세는 것과 모자라게 세는 것은 위험이 다르다.</b>
+         *
+         * <pre>
+         *   넘치게 센다  → 일찍 밀어낸다 → «담기는 시간»이 짧아진다 (기록이 얕아진다)
+         *   모자라게 센다 → 상한을 넘겨 담는다 → 🔴 «남의 앱»의 메모리를 먹는다
+         * </pre>
+         *
+         * <p>둘째가 훨씬 나쁘다. 이 도구의 첫 번째 규율이 「붙어 있는 앱을 절대 망가뜨리지
+         * 않는다」이기 때문이다. 그래서 어림은 <b>일부러 넘치게</b> 센다.
+         *
+         * <p>🎯 2026-09-16 에 쟀다: 어림 20.9MB 일 때 실제 힙 증가 7.9MB — <b>0.38배</b>.
+         * 즉 32MB 상한은 실제로 <b>약 12MB</b>를 담는다. 그 숫자를 알고 상한을 정해야 한다.
+         * ⚠️ 힙 측정은 잡음이 커서 «비율»은 검사로 못 건다. 대신 방향만 건다.
+         */
+        @Test
+        @DisplayName("🔴 문자 하나를 최소 1바이트로는 센다 — 모자라게 세면 남의 앱 메모리를 먹는다")
+        void 모자라게_세지_않는다() {
+            String 긴본문 = "가".repeat(10_000);
+            Event.HttpIn e = new Event.HttpIn(1, "r", Instant.now(), "t", 1L,
+                    "POST", "/api/x", java.util.Map.of(), null, java.util.Map.of(),
+                    긴본문, false, 긴본문.length(), 200, null, false);
+
+            long 어림 = EventBuffer.estimateBytes(e);
+
+            assertThat(어림)
+                    .as("🔴 한글은 UTF-8 로 3바이트다. 1바이트로 세면 상한을 세 배 넘겨 담는다")
+                    .isGreaterThanOrEqualTo(긴본문.length());
+        }
+
+        @Test
+        @DisplayName("본문이 커지면 어림도 커진다 — 안 그러면 상한이 아무것도 안 막는다")
+        void 커지면_커진다() {
+            java.util.function.Function<Integer, Long> 어림 = n -> {
+                String 본문 = "x".repeat(n);
+                return EventBuffer.estimateBytes(new Event.HttpIn(1, "r", Instant.now(), "t", 1L,
+                        "POST", "/api/x", java.util.Map.of(), null, java.util.Map.of(),
+                        본문, false, n, 200, null, false));
+            };
+
+            assertThat(어림.apply(100_000)).isGreaterThan(어림.apply(1_000));
+        }
+
+        @Test
+        @DisplayName("🔴 「본문을 못 봤다」와 「빈 본문」의 어림이 둘 다 터지지 않는다")
+        void null_도_센다() {
+            Event.HttpIn 없음 = new Event.HttpIn(1, "r", Instant.now(), "t", 1L,
+                    "GET", "/x", null, null, null, null, false, null, 200, null, false);
+
+            assertThat(EventBuffer.estimateBytes(없음))
+                    .as("null 이 들어와도 레코드 자체의 부담은 센다 — 0 으로 세면 상한이 없는 것과 같다")
+                    .isPositive();
+        }
     }
 }

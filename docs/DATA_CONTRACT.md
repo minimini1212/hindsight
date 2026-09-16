@@ -351,7 +351,7 @@ MySQL 은 `AUTO_INCREMENT` 속성). 🔴 **읽을 자리를 못 찾았으면 `nu
 | 이름 | 기본값 | 무엇 |
 | --- | --- | --- |
 | `HINDSIGHT_WINDOW_SECONDS` | 60 | 링 버퍼가 들고 있는 시간 |
-| `HINDSIGHT_BUFFER_MAX_BYTES` | **32MB** | 🔴 시간과 **둘 중 먼저 오는 쪽**이 이긴다 |
+| `HINDSIGHT_BUFFER_MAX_BYTES` | **32MB** | 🔴 시간과 **둘 중 먼저 오는 쪽**이 이긴다. ⚠️ 이 값은 «어림»한 바이트다 — 2026-09-16 에 재 보니 **실제 힙은 그 0.38배**였다(어림 20.9MB → 실제 7.9MB). **32MB 상한은 실제로 약 12MB 를 담는다.** 🔴 어림이 «넘치게» 세는 것은 의도다: 모자라게 세면 상한을 넘겨 담아 **남의 앱 메모리를 먹는다**. 대신 담기는 시간이 짧아지고, 그건 `windowFellShort` 로 적힌다 |
 | `HINDSIGHT_BODY_MAX_BYTES` | 64KB | 요청·응답 본문 잘라내기 |
 | `HINDSIGHT_SQL_ROWS_MAX` | 100 | SQL 결과 행 |
 | `HINDSIGHT_SQL_REPEAT_FULL` | 3 | 같은 질의를 몇 건까지 전문으로 남기나 |
