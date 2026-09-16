@@ -196,7 +196,12 @@ val 패키지가_봐도_되는_것 = mapOf(
     "privacy" to emptySet(),
     "replay" to emptySet(),
     "guard" to emptySet(),
-    "brain" to setOf("guard", "replay"),
+    // 🔴 brain → privacy 는 2026-09-16 에 «일부러» 열었다. PR 본문은 이 도구가 만드는 글 중
+    //    유일하게 저장소 «밖»으로 나가고, 올라간 뒤에는 못 되돌린다(지워도 알림 메일과 색인에 남는다).
+    //    그 글은 기록에서 «지어낸» 것이라 가명화가 훑은 자리 밖에서 값이 샐 수 있어서,
+    //    나가기 직전에 privacy.LeakScan 으로 한 번 더 훑는다.
+    //    ⚠️ 방향은 뒤집히지 않았다 — privacy 는 여전히 아무도 안 본다.
+    "brain" to setOf("guard", "replay", "privacy"),
     // cli 는 조립하는 자리라 전부 볼 수 있다. 여기까지 열어 두는 대신
     // «아래쪽»이 위를 못 보게 하는 것으로 방향을 지킨다.
     "cli" to setOf("store", "privacy", "replay", "guard", "brain"),
@@ -266,3 +271,76 @@ tasks.register("checkPackageDirection") {
 project(":hindsight-core").afterEvaluate {
     tasks.named("check") { dependsOn(rootProject.tasks.named("checkPackageDirection")) }
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 실행 스크립트가 «돌 수 있는 모양»인지 빌드가 본다
+//
+// 2026-09-16 에 `bin/hs.bat` 을 만들고 바로 돌렸더니 이렇게 죽었다:
+//   'HIS' is not recognized as an internal or external command
+// 'HIS' 는 주석 한 줄의 «조각»이다. 원인 둘이 겹쳐 있었다.
+//   ① 줄바꿈이 LF 뿐이라 cmd 가 줄을 엉뚱한 자리에서 잘랐다
+//   ② 주석의 한글이 UTF-8 인데 cmd 는 콘솔 코드페이지로 읽어서 깨진 바이트를
+//      «명령»으로 실행하려 했다
+//
+// .gitattributes 에 eol=crlf 가 이미 있었지만, 그건 «git 을 거칠 때» 고쳐 준다.
+// 방금 만든 파일은 아직 안 거쳤고, 그래서 안 잡혔다. 작업 트리에서 바로 잡는다.
+//
+// ⚠️ bin/hs(유닉스 쪽)는 반대다. CRLF 가 붙으면 `#!/usr/bin/env bash` 뒤의 \r 때문에
+//    「해석기를 못 찾겠다」가 난다. 그래서 둘을 «다른 규칙»으로 본다.
+// ────────────────────────────────────────────────────────────────────────────
+tasks.register("checkLauncherScripts") {
+    group = "verification"
+    description = "bin/ 의 실행 스크립트가 각 운영체제에서 실제로 돌 수 있는 모양인지 본다"
+
+    val batFiles = fileTree("bin") { include("*.bat", "*.cmd") }
+    val shFiles = fileTree("bin") { include("hs", "*.sh") }
+    inputs.files(batFiles, shFiles)
+
+    doLast {
+        val 어긴것 = mutableListOf<String>()
+
+        batFiles.forEach { f ->
+            val bytes = f.readBytes()
+            val lf = bytes.count { it == '\n'.code.toByte() }
+            val crlf = (0 until bytes.size - 1).count {
+                bytes[it] == '\r'.code.toByte() && bytes[it + 1] == '\n'.code.toByte()
+            }
+            if (lf != crlf) {
+                어긴것 += "  bin/${f.name}  →  줄바꿈이 CRLF 가 아니다 (LF ${lf - crlf}줄). " +
+                        "cmd 가 줄을 잘못 끊어 주석 조각을 «명령»으로 실행한다"
+            }
+            val 비아스키 = bytes.count { it < 0 }
+            if (비아스키 > 0) {
+                어긴것 += "  bin/${f.name}  →  ASCII 가 아닌 바이트 ${비아스키}개. " +
+                        "cmd 는 콘솔 코드페이지로 읽으므로 한글·이모지가 깨져 «명령»이 된다. " +
+                        "하고 싶은 말은 자바 쪽에 적는다 — 거기는 UTF-8 이 끝까지 간다"
+            }
+        }
+
+        shFiles.forEach { f ->
+            val bytes = f.readBytes()
+            val crlf = (0 until bytes.size - 1).count {
+                bytes[it] == '\r'.code.toByte() && bytes[it + 1] == '\n'.code.toByte()
+            }
+            if (crlf > 0) {
+                어긴것 += "  bin/${f.name}  →  CRLF 가 ${crlf}줄 있다. " +
+                        "셔뱅 뒤의 \r 때문에 「해석기를 못 찾겠다」로 죽는다"
+            }
+        }
+
+        if (어긴것.isNotEmpty()) {
+            throw GradleException(
+                """
+                |실행 스크립트가 돌 수 없는 모양이다 (${어긴것.size}곳):
+                |
+                |${어긴것.joinToString("\n")}
+                |
+                |🔴 이건 「돌려 보면 안다」가 아니다. 돌려 본 사람만 알고, 그 사람은
+                |   보통 이 도구를 처음 쓰는 사람이다.
+                """.trimMargin()
+            )
+        }
+    }
+}
+
+tasks.named("check") { dependsOn("checkLauncherScripts") }

@@ -1,5 +1,7 @@
 package io.hindsight.core.cli;
 
+import io.hindsight.core.replay.GeneratedTest;
+import io.hindsight.core.replay.ReplayTestGenerator;
 import io.hindsight.core.store.RecordingCodec;
 import io.hindsight.model.Recording;
 
@@ -19,6 +21,7 @@ import java.util.stream.Stream;
  * <pre>
  *   hs list              기록 목록. 최근 것이 위
  *   hs show &lt;번호&gt;       기록 하나를 자세히
+ *   hs test &lt;번호&gt;       그 기록을 「실패하는 JUnit 테스트」로 찍어 낸다
  * </pre>
  *
  * <h2>🔴 왜 picocli 를 안 쓰나 — 재 보고 정했다</h2>
@@ -69,6 +72,7 @@ public final class HindsightCli {
         return switch (args[0]) {
             case "list" -> list();
             case "show" -> args.length < 2 ? 번호가_없다() : show(args[1]);
+            case "test" -> args.length < 2 ? 번호가_없다() : test(args[1], 기반클래스(args));
             case "help", "--help", "-h" -> {
                 out.print(usage());
                 yield 0;
@@ -107,6 +111,75 @@ public final class HindsightCli {
         }
         out.print(CliRenderer.renderShow(found));
         return 0;
+    }
+
+    /**
+     * 🔴 <b>기록을 「실패하는 테스트」로 바꿔서 «화면에» 찍는다. 파일로 쓰지 않는다.</b>
+     *
+     * <p>파일로 떨구면 LLM 이 그 파일을 고쳐서 통과시킬 수 있다. 채점기를 고칠 수 있으면
+     * 채점이 아니므로, 여기서도 같은 규율을 따른다 — 고리 «안»에서는 메모리에서
+     * 컴파일해서 돌리고, 사람이 볼 때는 화면으로 본다.
+     *
+     * <p>⚠️ 그래서 이 명령은 <b>재생을 «돌리지» 않는다.</b> 재생은 관측 대상 앱의 JVM 안에서
+     * 일어나야 하고(DB 를 되돌리고 요청을 다시 보낸다), 명령줄에는 그 앱이 없다.
+     * 이 명령이 하는 것은 <b>「무엇을 단언할 것인가」를 사람이 읽게 하는 것</b>이다.
+     */
+    private int test(String id, String baseClassName) {
+        List<Recording> recordings = readAll();
+        if (recordings == null) {
+            return 1;
+        }
+        Recording found = recordings.stream().filter(r -> id.equals(r.id())).findFirst().orElse(null);
+        if (found == null) {
+            out.println("그 번호의 기록이 없다: " + id);
+            out.println("`hs list` 로 있는 번호를 볼 수 있다.");
+            return 1;
+        }
+
+        GeneratedTest generated;
+        try {
+            generated = ReplayTestGenerator.generate(found, baseClassName);
+        } catch (RuntimeException e) {
+            // 🔴 「만들지 못했다」를 빈 출력으로 넘기지 않는다. 빈 출력은 「단언할 게 없다」로 읽힌다.
+            out.println("이 기록으로는 테스트를 만들지 못했다: " + e.getMessage());
+            return 1;
+        }
+
+        out.println(generated.describe());
+        out.println();
+        out.println("── " + generated.fileName() + " ──");
+        out.println(generated.source());
+        out.println();
+        out.println("🔴 이 소스는 «파일로 안 쓴다». 디스크에 있으면 고쳐서 통과시킬 수 있기 때문이다.");
+        out.println("   붙여 넣을 자리: 관측 대상 앱의 src/test 아래, 기반 클래스 " + baseClassName);
+        if (기본_기반클래스.equals(baseClassName)) {
+            // 🔴 「만들었다」로 끝내면 받는 사람은 이게 도는 줄 안다. 안 돈다.
+            out.println();
+            out.println("⚠️ 기반 클래스가 기본값(" + 기본_기반클래스 + ")이다. 이건 «추상 클래스»라");
+            out.println("   이대로 붙여 넣으면 컴파일이 안 된다. 앱이 되돌리기와 요청 보내기를 채운");
+            out.println("   클래스를 만들고 `--base <그 클래스>` 로 다시 뽑아야 한다.");
+        }
+        return 0;
+    }
+
+    /** 기본 기반 클래스. 🔴 <b>추상 클래스라 이대로는 «안 돈다»</b> — 그래서 경고를 붙인다. */
+    static final String 기본_기반클래스 = "io.hindsight.core.replay.ReplayTestBase";
+
+    /**
+     * 생성된 테스트가 상속할 기반 클래스.
+     *
+     * <p>🔴 되돌리기와 요청 보내기는 <b>앱마다 다르다.</b> 기본값인 {@code ReplayTestBase} 는
+     * 추상 클래스라, 그대로 붙여 넣으면 <b>컴파일이 안 된다.</b> 2026-09-15 에 실제로
+     * 그 일이 있었고, javac 의 오류 메시지가 「추상 메서드를 안 덮었다」로 나와서
+     * 진짜 원인이 가려졌다. 그래서 이 명령은 <b>기본값을 쓸 때 경고를 찍는다.</b>
+     */
+    private String 기반클래스(String[] args) {
+        for (int i = 2; i < args.length - 1; i++) {
+            if ("--base".equals(args[i])) {
+                return args[i + 1];
+            }
+        }
+        return 기본_기반클래스;
     }
 
     private int 번호가_없다() {
@@ -156,8 +229,13 @@ public final class HindsightCli {
 
                   hs list           기록 목록 (최근 것이 위)
                   hs show <번호>    기록 하나를 자세히
+                  hs test <번호>    그 기록을 「실패하는 JUnit 테스트」로 찍어 낸다
+                                    --base <클래스>  기반 클래스 (앱마다 다르다)
 
                 기록 폴더는 HINDSIGHT_STORE_DIR 환경변수로 정한다 (기본: recordings)
+
+                🔴 `hs test` 는 소스를 «화면에» 찍는다. 파일로 안 쓴다 —
+                   디스크에 있으면 고쳐서 통과시킬 수 있기 때문이다.
                 """;
     }
 }

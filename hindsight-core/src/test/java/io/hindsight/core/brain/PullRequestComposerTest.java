@@ -279,4 +279,113 @@ class PullRequestComposerTest {
             assertThat(draft.branchName()).isEqualTo("hindsight/a1b2");
         }
     }
+
+    @Nested
+    @DisplayName("🔴 나가기 직전에 한 번 더 훑는다")
+    class 유출검사 {
+
+        /**
+         * 🔴 <b>진입점 경로</b>에 개인정보가 박힌 기록. 이 자리는 본문에 그대로 실린다.
+         *
+         * <p>⚠️ 처음에는 예외 «메시지»에 이메일을 넣어 시험했는데, 시험이 알려 줬다 —
+         * <b>메시지는 본문에 아예 안 실린다</b>(타입만 실린다). 즉 그 경로로는 안 샌다.
+         * 실제로 새는 자리는 <b>진입점 · 질의문 · 생성된 테스트가 못 단언한 것</b>처럼
+         * 글에 그대로 옮겨 적는 곳이다.
+         */
+        private Recording 개인정보가_박힌_기록() {
+            return new Recording(Recording.CURRENT_SCHEMA_VERSION, "leak1", T0,
+                    new Trigger(Trigger.Kind.LATENCY, T0,
+                            "GET /api/users/hong.gildong@example.com/orders?phone=010-1234-5678",
+                            null, 3400L, "k", 1),
+                    new AppInfo("demo-app", null, null, "21", "0.1.0", null),
+                    List.of(), null, null, null,
+                    new Integrity(60, 57.0, 0, 0, 0, 1000, 0, false));
+        }
+
+        @Test
+        @DisplayName("🔴 모양이 걸리면 확신도가 높아도 «자동으로 안 연다»")
+        void 걸리면_자동으로_안_연다() {
+            var draft = PullRequestComposer.compose(개인정보가_박힌_기록(),
+                    재생결과(확인된_재생, OracleVerdict.pass("응답", "같다")),
+                    채점(Confidence.HIGH, 확인된_재생, 정직한_패치), null, 1);
+
+            assertThat(draft.confidence())
+                    .as("채점 자체는 통과했다 — 그래서 이 검사가 없으면 그대로 올라간다")
+                    .isEqualTo(Confidence.HIGH);
+            assertThat(draft.opensAutomatically())
+                    .as("🔴 GitHub 에 올라가면 못 되돌린다. 지워도 알림 메일과 색인에 남는다")
+                    .isFalse();
+            assertThat(draft.body())
+                    .contains("자동으로 열리지 않고")
+                    .as("🔴 막기만 하고 안 가리면, 사람이 손으로 열 때 그대로 나간다")
+                    .contains("본문에서도 가렸다");
+        }
+
+        @Test
+        @DisplayName("🔴 무엇이 걸렸는지 적되, 값은 «가려서» 적는다")
+        void 값을_다시_적지_않는다() {
+            var draft = PullRequestComposer.compose(개인정보가_박힌_기록(),
+                    재생결과(확인된_재생), 채점(Confidence.HIGH, 확인된_재생, 정직한_패치), null, 1);
+
+            assertThat(draft.body()).contains("이메일").contains("휴대폰 번호");
+            assertThat(draft.body())
+                    .as("🔴 걸렸다고 본문에 원본을 또 적으면 새는 자리를 하나 더 만드는 것이다")
+                    .doesNotContain("hong.gildong@example.com");
+        }
+
+        @Test
+        @DisplayName("🔴 깨끗할 때도 「훑었다」를 적는다 — 아무 말이 없으면 «안 훑은 것»과 같다")
+        void 깨끗해도_적는다() {
+            var draft = PullRequestComposer.compose(기록(지연방아쇠(1)),
+                    재생결과(확인된_재생, OracleVerdict.pass("응답", "같다")),
+                    채점(Confidence.HIGH, 확인된_재생, 정직한_패치), null, 1);
+
+            assertThat(draft.body()).contains("나가기 전 한 번 더 훑었다").contains("안 걸렸다");
+            assertThat(draft.opensAutomatically()).isTrue();
+        }
+
+        @Test
+        @DisplayName("🔴 «못 찾는 것»이 항상 같이 나간다 — 없으면 「훑었으니 안전하다」로 읽힌다")
+        void 못_찾는_것도_적는다() {
+            var draft = PullRequestComposer.compose(기록(지연방아쇠(1)),
+                    재생결과(확인된_재생), 채점(Confidence.HIGH, 확인된_재생, 정직한_패치), null, 1);
+
+            assertThat(draft.body()).contains("모양으로는 못 찾는 것").contains("이름");
+        }
+    }
+
+    @Nested
+    @DisplayName("본문 길이 — GitHub 이 거절하기 «전»에 자른다")
+    class 길이 {
+
+        @Test
+        @DisplayName("상한 아래면 손대지 않는다")
+        void 짧으면_그대로() {
+            String 짧은것 = "가".repeat(100);
+
+            assertThat(PullRequestComposer.길이를_자른다(짧은것)).isEqualTo(짧은것);
+        }
+
+        @Test
+        @DisplayName("🔴 자를 때 «잘랐다는 사실과 원래 길이»를 적는다 — 조용히 짧아지면 그게 전부인 줄 안다")
+        void 자르면_말한다() {
+            String 긴것 = "가".repeat(PullRequestComposer.본문_길이_상한 + 5_000);
+
+            String 잘린것 = PullRequestComposer.길이를_자른다(긴것);
+
+            assertThat(잘린것).contains("여기서 잘렸다");
+            assertThat(잘린것).contains(String.valueOf(긴것.length()));
+            assertThat(잘린것).contains("잘린 부분에 무엇이 있었는지는 이 PR 로 알 수 없다");
+        }
+
+        @Test
+        @DisplayName("자른 뒤에도 GitHub 상한(65,536자) 안이다")
+        void 자른_뒤에도_상한_안() {
+            String 긴것 = "가".repeat(200_000);
+
+            assertThat(PullRequestComposer.길이를_자른다(긴것).length())
+                    .as("설명을 붙이느라 다시 상한을 넘으면 자른 의미가 없다")
+                    .isLessThan(65_536);
+        }
+    }
 }
