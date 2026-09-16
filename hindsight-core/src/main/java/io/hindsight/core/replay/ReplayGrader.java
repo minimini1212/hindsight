@@ -247,6 +247,14 @@ public final class ReplayGrader {
             missing.add("EVENTS");
             notes.add("버퍼가 넘쳐 밀어낸 이벤트가 " + integrity.evictedEvents() + "건 있다");
         }
+        if (integrity.agentErrors() > 0) {
+            // 🔴 2026-09-16 까지 이 줄이 «없었다». 기록기가 예외를 삼키면 그 자리에서
+            //    무언가가 «안 담겼는데», 등급은 그걸 모른 채 VERIFIED_DETERMINISTIC 을 줬다.
+            //    삼킨 예외 하나는 「이벤트 하나를 못 담았다」와 같은 무게의 사실이다.
+            missing.add("AGENT_ERRORS");
+            notes.add("기록기 내부에서 삼킨 예외가 " + integrity.agentErrors()
+                    + "건 있다. 그 자리에서 무엇을 못 담았는지는 모른다");
+        }
         if (integrity.instrumentationDisabled()) {
             missing.add("INSTRUMENTATION");
             notes.add("기록 중 계측이 스스로 꺼졌다");

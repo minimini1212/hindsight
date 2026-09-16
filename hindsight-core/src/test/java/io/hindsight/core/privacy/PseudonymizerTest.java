@@ -3,6 +3,8 @@ package io.hindsight.core.privacy;
 import io.hindsight.model.AppInfo;
 import io.hindsight.model.Event;
 import io.hindsight.model.Recording;
+import io.hindsight.model.Summary;
+import io.hindsight.model.Trigger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -176,6 +178,168 @@ class PseudonymizerTest {
             assertThat(out.params()).isNull();
             assertThat(out.rows()).isNull();
             assertThat(out.rowCount()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("🔴 방아쇠 — 2026-09-16 까지 통째로 «안 훑던» 자리")
+    class 방아쇠 {
+
+        private static final String 이메일 = "hong.gildong@example.com";
+        private static final String 진입점 = "GET /api/users/" + 이메일 + "/orders";
+
+        private Recording 방아쇠가_있는_기록() {
+            Trigger trigger = new Trigger(
+                    Trigger.Kind.EXCEPTION,
+                    Instant.parse("2026-09-15T00:00:00Z"),
+                    진입점,
+                    new Trigger.ExceptionInfo(
+                            "java.lang.IllegalArgumentException",
+                            "없는 회원: " + 이메일 + " (010-1234-5678)",
+                            List.of("at a.b.C.d(C.java:12)", "at x.Y.z(" + 이메일 + ")")),
+                    null,
+                    Trigger.dedupKeyOf(진입점, Trigger.Kind.EXCEPTION, null),
+                    1);
+            return new Recording(
+                    Recording.CURRENT_SCHEMA_VERSION, "t", Instant.parse("2026-09-15T00:00:00Z"),
+                    trigger,
+                    new AppInfo("demo-app", null, null, "21", "0.1.0", null),
+                    List.of(), null, null, null, null);
+        }
+
+        @Test
+        @DisplayName("🔴 진입점 경로에 박힌 이메일이 가려진다")
+        void 진입점() {
+            Trigger out = new Pseudonymizer(KEY).apply(방아쇠가_있는_기록()).trigger();
+
+            assertThat(out.entryPoint()).doesNotContain(이메일);
+            assertThat(out.entryPoint())
+                    .as("경로의 «모양»은 남아야 한다 — 어느 API 였는지를 못 읽으면 진단이 안 된다")
+                    .startsWith("GET /api/users/").endsWith("/orders");
+        }
+
+        @Test
+        @DisplayName("🔴 예외 메시지의 이메일과 전화번호가 가려진다")
+        void 예외_메시지() {
+            Trigger out = new Pseudonymizer(KEY).apply(방아쇠가_있는_기록()).trigger();
+
+            assertThat(out.exception().message())
+                    .doesNotContain(이메일)
+                    .doesNotContain("010-1234-5678");
+            assertThat(out.exception().type())
+                    .as("예외 «종류»는 클래스 이름이라 안 건드린다")
+                    .isEqualTo("java.lang.IllegalArgumentException");
+        }
+
+        @Test
+        @DisplayName("🔴 dedupKey 도 가려진다 — 여기가 진입점을 «그대로 이어 붙인» 자리다")
+        void 묶는_열쇠() {
+            // Trigger.dedupKeyOf 는 해시가 아니라 문자열 이어 붙이기다.
+            // 진입점만 가리고 이걸 놔두면 같은 값이 바로 옆 자리에 그대로 남는다.
+            Trigger out = new Pseudonymizer(KEY).apply(방아쇠가_있는_기록()).trigger();
+
+            assertThat(out.dedupKey()).doesNotContain(이메일);
+        }
+
+        @Test
+        @DisplayName("🔴 진입점과 dedupKey 가 «같은 가명»으로 가려진다 — 어긋나면 묶기가 깨진다")
+        void 둘이_아귀가_맞는다() {
+            Trigger out = new Pseudonymizer(KEY).apply(방아쇠가_있는_기록()).trigger();
+
+            assertThat(out.dedupKey())
+                    .as("dedupKey 는 진입점으로 시작한다. 둘이 다른 가명이면 같은 사고가 안 묶인다")
+                    .startsWith(out.entryPoint());
+        }
+
+        @Test
+        @DisplayName("스택 줄도 훑는다 — 「보통 값이 없다」를 「없다」로 접지 않는다")
+        void 스택() {
+            Trigger out = new Pseudonymizer(KEY).apply(방아쇠가_있는_기록()).trigger();
+
+            assertThat(String.join(" ", out.exception().stack())).doesNotContain(이메일);
+            assertThat(out.exception().stack().getFirst())
+                    .as("값이 없는 줄은 그대로여야 한다")
+                    .isEqualTo("at a.b.C.d(C.java:12)");
+        }
+
+        @Test
+        @DisplayName("🔴 스택을 «못 잡은 것»이 빈 목록으로 바뀌지 않는다")
+        void 스택이_null_이면_null() {
+            Recording 기록 = new Recording(
+                    Recording.CURRENT_SCHEMA_VERSION, "t", Instant.parse("2026-09-15T00:00:00Z"),
+                    new Trigger(Trigger.Kind.LATENCY, Instant.parse("2026-09-15T00:00:00Z"),
+                            "GET /a", new Trigger.ExceptionInfo("T", null, null), 10L, "k", 1),
+                    new AppInfo("demo-app", null, null, "21", "0.1.0", null),
+                    List.of(), null, null, null, null);
+
+            assertThat(new Pseudonymizer(KEY).apply(기록).trigger().exception().stack()).isNull();
+        }
+
+        @Test
+        @DisplayName("방아쇠가 없는 기록은 그대로 null 이다")
+        void 방아쇠가_없으면() {
+            assertThat(new Pseudonymizer(KEY).apply(recordingWith()).trigger()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("🔴 요약층 — 여기도 2026-09-16 까지 안 훑었다")
+    class 요약층 {
+
+        private static final String 이메일 = "kim@example.com";
+
+        private Recording 요약이_있는_기록() {
+            Summary summary = new Summary(
+                    60,
+                    List.of(new Summary.SqlShape("9f2a", "select m from Member m where m.id = ?", 8, 12L)),
+                    List.of(new Summary.RequestLine(Instant.parse("2026-09-15T00:00:00Z"),
+                            "GET", "/api/users/" + 이메일, 200, 12L)),
+                    List.of(new Summary.PoolSample(Instant.parse("2026-09-15T00:00:00Z"), 8, 2)));
+            return new Recording(
+                    Recording.CURRENT_SCHEMA_VERSION, "t", Instant.parse("2026-09-15T00:00:00Z"),
+                    null, new AppInfo("demo-app", null, null, "21", "0.1.0", null),
+                    List.of(), summary, null, null, null);
+        }
+
+        @Test
+        @DisplayName("🔴 요약의 요청 경로에 박힌 이메일이 가려진다")
+        void 요청_경로() {
+            Summary out = new Pseudonymizer(KEY).apply(요약이_있는_기록()).summary();
+
+            assertThat(out.requestLines().getFirst().path()).doesNotContain(이메일);
+            assertThat(out.requestLines().getFirst().status())
+                    .as("숫자는 그대로여야 한다")
+                    .isEqualTo(200);
+        }
+
+        @Test
+        @DisplayName("🔴 질의 «모양»은 안 건드린다 — 해시와 아귀가 안 맞게 된다")
+        void 질의_모양은_그대로() {
+            Summary out = new Pseudonymizer(KEY).apply(요약이_있는_기록()).summary();
+
+            // normalized 는 이미 값이 ? 로 빠진 뒤의 모습이라 남을 값이 없다.
+            // 그리고 sqlHash 가 이 글자에서 나온 것이라, 글자만 바꾸면
+            // 진단이 「이 해시가 무슨 질의였나」를 영영 못 찾는다.
+            assertThat(out.sqlShapes().getFirst().normalized())
+                    .isEqualTo("select m from Member m where m.id = ?");
+            assertThat(out.sqlShapes().getFirst().sqlHash()).isEqualTo("9f2a");
+        }
+
+        @Test
+        @DisplayName("🔴 「요청 줄을 못 모았다」가 빈 목록으로 바뀌지 않는다")
+        void 요청줄이_null_이면_null() {
+            Recording 기록 = new Recording(
+                    Recording.CURRENT_SCHEMA_VERSION, "t", Instant.parse("2026-09-15T00:00:00Z"),
+                    null, new AppInfo("demo-app", null, null, "21", "0.1.0", null),
+                    List.of(), new Summary(60, List.of(), null, List.of()), null, null, null);
+
+            assertThat(new Pseudonymizer(KEY).apply(기록).summary().requestLines()).isNull();
+        }
+
+        @Test
+        @DisplayName("요약이 없는 기록은 그대로 null 이다")
+        void 요약이_없으면() {
+            assertThat(new Pseudonymizer(KEY).apply(recordingWith()).summary()).isNull();
         }
     }
 }

@@ -232,6 +232,27 @@ class ReplayGraderTest {
         }
 
         @Test
+        @DisplayName("🔴 기록기가 «삼킨 예외»가 있으면 PARTIAL — 계측이 꺼지지 않았어도")
+        void 삼킨_예외가_있으면_PARTIAL() {
+            // 🔴 2026-09-16 까지 이걸 안 봤다. 기록기가 예외를 삼키면 그 자리에서
+            //    무언가가 «안 담겼는데», 등급은 모른 채 VERIFIED_DETERMINISTIC 을 줬다.
+            //    계측이 «꺼지지는 않았다»는 게 요점이다 — 꺼지기 전에도 구멍은 난다.
+            Integrity 삼킴 = new Integrity(60, 57.0, 0, 0, 0, 1000, 3, false);
+
+            ReplayInfo info = ReplayGrader.grade(n플러스원_기록(삼킴),
+                    ReplayObservation.builder()
+                            .responseStatus(200).responseBody("{\"orders\":[]}")
+                            .executedSql(기록과_같은_질의()).build(),
+                    충분히_되돌림, true);
+
+            assertThat(info.grade())
+                    .as("삼킨 예외 하나는 「이벤트 하나를 못 담았다」와 같은 무게의 사실이다")
+                    .isEqualTo(ReplayInfo.Grade.PARTIAL);
+            assertThat(info.missing()).contains("AGENT_ERRORS");
+            assertThat(info.notes()).contains("3");
+        }
+
+        @Test
         @DisplayName("계측이 스스로 꺼진 기록도 PARTIAL")
         void 계측이_꺼졌으면_PARTIAL() {
             Integrity 꺼짐 = new Integrity(60, 57.0, 0, 0, 0, 1000, 50, true);

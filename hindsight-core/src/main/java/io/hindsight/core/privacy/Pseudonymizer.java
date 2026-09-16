@@ -3,6 +3,8 @@ package io.hindsight.core.privacy;
 import io.hindsight.model.AppInfo;
 import io.hindsight.model.Event;
 import io.hindsight.model.Recording;
+import io.hindsight.model.Summary;
+import io.hindsight.model.Trigger;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -113,14 +115,96 @@ public final class Pseudonymizer {
                 recording.schemaVersion(),
                 recording.id(),
                 recording.capturedAt(),
-                recording.trigger(),
+                applyToTrigger(recording.trigger()),
                 applyToApp(recording.app()),
                 events,
-                recording.summary(),
+                applyToSummary(recording.summary()),
                 recording.jfr(),
                 recording.replay(),
                 recording.integrity()
         );
+    }
+
+    /**
+     * 🔴 <b>방아쇠도 훑는다.</b> 2026-09-16 까지 여기가 <b>통째로 빠져 있었다.</b>
+     *
+     * <h2>무엇이 새고 있었나 — 세 자리다</h2>
+     * <pre>
+     *   entryPoint           GET /api/users/hong@example.com/orders   ← 경로에 값이 박힌다
+     *   exception.message    없는 회원: hong@example.com (010-1234-5678)
+     *   dedupKey             🔴 entryPoint 를 «그대로 이어 붙인» 것이다
+     * </pre>
+     *
+     * <p>{@link Trigger#dedupKeyOf} 는 해시가 아니라 <b>문자열 이어 붙이기</b>다.
+     * 그래서 {@code entryPoint} 만 가리고 {@code dedupKey} 를 놔두면, 같은 값이
+     * 바로 옆 자리에 <b>그대로 남는다.</b> 가명화가 결정적(같은 입력 → 같은 가명)이므로
+     * 둘을 같은 함수로 훑으면 <b>서로 아귀가 맞은 채로</b> 가려진다.
+     *
+     * <h2>⚠️ 스택은 훑되, 그게 값을 찾으리라 기대하지 않는다</h2>
+     * 스택 줄은 보통 {@code at a.b.C.d(C.java:12)} 라 값이 없다. 그래도 훑는 이유는
+     * 프레임워크가 만든 예외가 줄 안에 인자를 끼워 넣는 일이 있기 때문이고,
+     * 🔴 <b>「보통 없다」를 「없다」로 접지 않기 위해서</b>다.
+     */
+    private Trigger applyToTrigger(Trigger trigger) {
+        if (trigger == null) {
+            return null;
+        }
+        return new Trigger(
+                trigger.kind(),
+                trigger.at(),
+                cleanText(trigger.entryPoint()),
+                applyToException(trigger.exception()),
+                trigger.latencyMs(),
+                // 🔴 entryPoint 와 «같은» 함수로 훑는다. 다른 함수를 쓰면 둘이 어긋나고,
+                //    어긋나면 「같은 사고인가」를 묶는 열쇠가 깨진다.
+                cleanText(trigger.dedupKey()),
+                trigger.dedupCount());
+    }
+
+    private Trigger.ExceptionInfo applyToException(Trigger.ExceptionInfo exception) {
+        if (exception == null) {
+            return null;
+        }
+        return new Trigger.ExceptionInfo(
+                // 🔴 예외 «종류»는 안 건드린다. 클래스 이름이고, 바꾸면 진단이 못 읽는다.
+                exception.type(),
+                cleanText(exception.message()),
+                exception.stack() == null
+                        ? null   // 🔴 「스택을 못 잡았다」와 「스택이 비었다」는 다른 사실이다
+                        : exception.stack().stream().map(this::cleanText).toList());
+    }
+
+    /**
+     * 🔴 <b>요약층도 훑는다.</b> 여기도 2026-09-16 까지 빠져 있었다.
+     *
+     * <h2>무엇을 훑고 무엇을 «안» 훑나</h2>
+     * <pre>
+     *   RequestLine.path   ✅ 훑는다 — entryPoint 와 같은 모양이고 같은 값이 박힌다
+     *   SqlShape.normalized ❌ 안 훑는다 — 아래 이유
+     *   PoolSample          ❌ 숫자뿐이다
+     * </pre>
+     *
+     * <h2>⚠️ 질의 «모양»을 안 훑는 이유</h2>
+     * {@code normalized} 는 이미 값이 빠진 것이다 — 따옴표 안의 글자와 숫자가
+     * {@code ?} 로 바뀐 뒤의 모습이라, 값이 남아 있을 자리가 없다.
+     *
+     * <p>🔴 그리고 바꾸면 <b>{@code sqlHash} 와 아귀가 안 맞는다.</b> 해시는 이 글자에서
+     * 나온 것이라, 글자만 바꾸면 <b>진단이 「이 해시가 무슨 질의였나」를 영영 못 찾는다.</b>
+     */
+    private Summary applyToSummary(Summary summary) {
+        if (summary == null) {
+            return null;
+        }
+        return new Summary(
+                summary.windowSeconds(),
+                summary.sqlShapes(),
+                summary.requestLines() == null
+                        ? null   // 🔴 「요청 줄을 못 모았다」와 「요청이 없었다」는 다르다
+                        : summary.requestLines().stream()
+                                .map(r -> new Summary.RequestLine(
+                                        r.at(), r.method(), cleanText(r.path()), r.status(), r.ms()))
+                                .toList(),
+                summary.connectionSamples());
     }
 
     private AppInfo applyToApp(AppInfo app) {

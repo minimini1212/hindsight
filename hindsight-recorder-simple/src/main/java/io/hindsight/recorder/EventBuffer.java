@@ -88,6 +88,9 @@ public final class EventBuffer {
      */
     private final AtomicLong accepted = new AtomicLong();
     private final AtomicLong appended = new AtomicLong();
+
+    /** 🔴 옮기는 스레드가 삼킨 예외. 안 세면 기록기가 조용히 고장 나도 파일은 「멀쩡함」으로 나간다. */
+    private final AtomicLong drainErrors = new AtomicLong();
     private long ringBytes; // ringLock 이 지킨다
 
     private final Thread drainer;
@@ -197,6 +200,7 @@ public final class EventBuffer {
     }
 
     public long droppedEvents() { return droppedEvents.get(); }
+    public long drainErrors() { return drainErrors.get(); }
     public long evictedEvents() { return evictedEvents.get(); }
     public long evictedBytes() { return evictedBytes.get(); }
 
@@ -234,7 +238,12 @@ public final class EventBuffer {
             } catch (Throwable t) {
                 // 🔴 우리 스레드가 죽으면 그 뒤로 기록이 통째로 안 쌓이는데 «아무 오류도 안 난다».
                 //    조용히 멈추는 것이 가장 나쁜 고장이라, 무엇이 와도 돌던 자리를 지킨다.
-                //    셈은 Recorder 쪽 agentErrors 가 맡는다.
+                //
+                // 🔴 그런데 2026-09-16 까지 여기서 «세지 않았다». 주석에는 「셈은 Recorder 쪽
+                //    agentErrors 가 맡는다」고 적혀 있었는데, Recorder 는 자기 것만 센다 —
+                //    이 스레드가 삼킨 것은 아무 데도 안 남았다. 즉 기록기가 조용히 고장 나도
+                //    기록 파일은 「멀쩡함」으로 나갔다. 그건 이 도구가 잡으려는 결함 그 자체다.
+                drainErrors.incrementAndGet();
             }
         }
     }

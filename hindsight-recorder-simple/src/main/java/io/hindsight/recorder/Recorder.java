@@ -205,7 +205,9 @@ public final class Recorder {
                 buffer.evictedEvents(),
                 buffer.evictedBytes(),
                 buffer.bufferBytes(),
-                errors.get(),
+                // 🔴 옮기는 스레드가 삼킨 것도 «같이» 센다. 2026-09-16 까지 그건
+                //    아무 데도 안 남아서, 기록기가 조용히 고장 나도 파일은 「멀쩡함」이었다.
+                errors.get() + buffer.drainErrors(),
                 disabled.get());
     }
 

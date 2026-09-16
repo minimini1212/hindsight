@@ -26,6 +26,9 @@ import java.io.PrintWriter;
 public final class CachingResponse extends HttpServletResponseWrapper {
 
     private final int maxBytes;
+
+    /** 🔴 앱이 출력 스트림이나 Writer 를 «한 번이라도» 가져갔나. */
+    private boolean bodyWasWritten;
     private final ByteArrayOutputStream copy = new ByteArrayOutputStream();
 
     private CopyingStream stream;
@@ -36,6 +39,17 @@ public final class CachingResponse extends HttpServletResponseWrapper {
     public CachingResponse(HttpServletResponse response, int maxBytes) {
         super(response);
         this.maxBytes = maxBytes;
+    }
+
+    /**
+     * 🔴 앱이 응답 본문을 <b>쓰기는 했나.</b>
+     *
+     * <p>「안 썼다」와 「빈 것을 썼다」는 다른 사실이다. 잡은 바이트가 0 이라는 것만으로는
+     * 둘을 구별할 수 없고, 구별 못 하면 <b>스트림을 못 감싼 것이 「빈 응답」으로 기록된다.</b>
+     * 요청 쪽의 {@code bodyWasRead()} 와 같은 짝이다.
+     */
+    public boolean bodyWasWritten() {
+        return bodyWasWritten;
     }
 
     public byte[] capturedBody() {
@@ -58,6 +72,7 @@ public final class CachingResponse extends HttpServletResponseWrapper {
         if (stream == null) {
             stream = new CopyingStream(super.getOutputStream());
         }
+        bodyWasWritten = true;
         return stream;
     }
 
@@ -69,6 +84,7 @@ public final class CachingResponse extends HttpServletResponseWrapper {
                     getOutputStream(),
                     encoding != null ? encoding : java.nio.charset.StandardCharsets.UTF_8.name()), true);
         }
+        bodyWasWritten = true;
         return writer;
     }
 
