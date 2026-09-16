@@ -58,24 +58,26 @@ class SqlShapesTest {
     }
 
     @Nested
-    @DisplayName("🔴 안 듣는 것 — 알고 두는 한계다")
-    class 안듣는것 {
+    @DisplayName("✅ IN 절도 접힌다 — 2026-09-16 에 «고친» 자리다")
+    class IN절 {
 
         @Test
-        @DisplayName("🔴 IN 절의 «자리 개수»가 다르면 다른 모양으로 세인다")
-        void IN절의_자리_개수는_못_접는다() {
+        @DisplayName("✅ IN 절의 «자리 개수»가 달라도 같은 모양이다")
+        void IN절의_자리_개수를_접는다() {
             String 둘 = "select * from member where id in (1, 2)";
             String 셋 = "select * from member where id in (1, 2, 3)";
 
-            // 값은 전부 ? 로 바뀌지만 «개수»가 남는다.
-            assertThat(SqlShapes.of(둘).normalized()).isEqualTo("select * from member where id in (?, ?)");
-            assertThat(SqlShapes.of(셋).normalized()).isEqualTo("select * from member where id in (?, ?, ?)");
-            assertThat(SqlShapes.of(둘).hash()).isNotEqualTo(SqlShapes.of(셋).hash());
+            // ⚠️ 2026-09-16 «이전»에는 이 둘이 다른 모양이었다 —
+            //    "… in (?, ?)" 와 "… in (?, ?, ?)". 하이버네이트가 인자 개수만큼
+            //    물음표를 붙이기 때문이고, 그래서 같은 코드 한 줄이 여러 모양으로 흩어졌다.
+            assertThat(SqlShapes.of(둘).normalized())
+                    .isEqualTo("select * from member where id in (?)");
+            assertThat(SqlShapes.of(둘).hash()).isEqualTo(SqlShapes.of(셋).hash());
         }
 
         @Test
-        @DisplayName("🔴 그래서 배치 크기가 들쭉날쭉한 앱에서는 모양이 여러 개로 흩어진다")
-        void 배치_크기가_다르면_모양이_흩어진다() {
+        @DisplayName("✅ 배치 크기가 들쭉날쭉해도 모양은 «하나»다")
+        void 배치_크기가_달라도_한_모양() {
             long 서로다른모양 = java.util.stream.IntStream.rangeClosed(1, 10)
                     .mapToObj(n -> "select * from member where id in ("
                             + "?, ".repeat(n - 1) + "?)")
@@ -83,8 +85,27 @@ class SqlShapesTest {
                     .distinct()
                     .count();
 
-            // 같은 코드가 낸 같은 질의인데 모양이 10개로 보인다.
-            assertThat(서로다른모양).isEqualTo(10);
+            // 🔴 고치기 «전»에는 여기가 10 이었다. 같은 코드가 낸 같은 질의인데
+            //    모양이 10개로 보였고, 그래서 반복 문턱(2)을 못 넘어 N+1 을 놓쳤다.
+            assertThat(서로다른모양).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("🔴 IN 이 아닌 괄호는 «안» 건드린다 — 접기가 과하면 다른 질의가 합쳐진다")
+        void IN이_아니면_안_접는다() {
+            String 함수 = "select coalesce(a, b, c) from t";
+
+            assertThat(SqlShapes.of(함수).normalized())
+                    .as("괄호 안의 쉼표를 다 접으면 서로 다른 질의가 한 모양이 된다")
+                    .contains("coalesce(a, b, c)");
+        }
+
+        @Test
+        @DisplayName("⚠️ 접으면 «인자가 몇 개였나»를 모양에서 잃는다 — 그건 원문에 남는다")
+        void 개수는_원문에_남는다() {
+            // 🔴 알고 두는 손실이다. 모양은 «세는 데» 쓰고, 읽는 것은 events 의 sql 원문이다.
+            assertThat(SqlShapes.of("select * from t where id in (1,2,3)").normalized())
+                    .doesNotContain("?, ?, ?");
         }
     }
 

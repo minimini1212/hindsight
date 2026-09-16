@@ -26,6 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 🔬 실험 ⑰ — <b>질의 「모양」 접기가 진짜 앱에서 얼마나 듣나.</b>
  *
+ * <h2>⚠️ 이 시험은 2026-09-16 에 «뒤집혔다»</h2>
+ * 처음 쓸 때는 <b>「얼마나 나쁜가」를 숫자로 못 박는</b> 시험이었다 —
+ * 같은 코드 한 줄이 모양 <b>5가지</b>를 만들고, 5번 반복된 것이 오라클에는 <b>1번</b>으로 보였다.
+ * 그날 접기를 고쳤고, 그래서 지금은 <b>「제대로 접히는가」</b>를 지킨다.
+ * 🔴 옛 숫자를 주석에 남겨 둔다 — 고친 것이 무엇이었는지가 사라지면 안 된다.
+ *
  * <h2>왜 이걸 재나</h2>
  * 이 도구는 N+1 을 <b>「같은 모양의 질의가 몇 번 반복됐나」</b>로 잡는다. 그 「모양」은
  * {@code SqlShapes.normalize} 가 만든다 — 따옴표 안의 글자와 숫자를 {@code ?} 로 바꾼다.
@@ -42,11 +48,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>요약층이 넘친다</b> — 모양 목록이 인자 개수만큼 늘어난다</li>
  * </ol>
  *
- * <h2>이 시험이 «하지 않는» 것</h2>
- * ⚠️ 여기서 접기를 <b>고치지 않는다.</b> 고치려면 {@code in (?,?,?)} 를 {@code in (...)} 로
- * 접어야 하는데, 그건 기록기와 재생이 <b>둘 다 같은 규칙으로</b> 바뀌어야 하는 일이고
- * ({@code ShapeAgreementTest} 가 지키는 계약이다), 그 판단은 이 시험의 몫이 아니다.
- * 🔴 <b>이 시험은 「얼마나 나쁜가」를 숫자로 못 박아 둔다.</b>
+ * <h2>🔴 고치면서 판 번호가 올라갔다 (1 → 2)</h2>
+ * {@code Summary.SqlShape.sqlHash} 는 <b>파일에 저장되는 값</b>이다. 규칙이 바뀌면
+ * 1판 파일에 적힌 해시를 지금 코드는 <b>절대 만들어 내지 못한다</b> —
+ * 그걸 안 드러내면 「모름」이 「없음」이 된다.
  */
 @SpringBootTest
 @DisplayName("🔬 실험 ⑰ — 질의 모양 접기가 진짜 앱에서 얼마나 듣나")
@@ -89,7 +94,7 @@ class SqlShapeFoldingTest {
     }
 
     @Test
-    @DisplayName("🔴 같은 코드 한 줄인데 IN 인자 개수마다 «다른 모양»이 된다")
+    @DisplayName("✅ 같은 코드 한 줄이면 IN 인자 개수가 달라도 «같은 모양»이다")
     void IN_절은_개수마다_모양이_갈라진다() {
         List<Long> 아이디 = orderRepository.findAll().stream().map(Order::getId).toList();
 
@@ -111,12 +116,13 @@ class SqlShapeFoldingTest {
         System.out.println("  🔴 같은 코드 한 줄이 만든 «서로 다른 모양»: " + 모양들.size() + "가지");
 
         assertThat(모양들.size())
-                .as("🔴 지금은 인자 개수마다 갈라진다. 이 숫자가 1 이 되면 접기가 고쳐진 것이다")
-                .isGreaterThan(1);
+                .as("🔴 2026-09-16 «이전»에는 여기가 5 였다 — 인자 개수마다 갈라졌다. "
+                        + "접기를 고쳐서 1 이 됐고, 그게 이 시험이 지키는 사실이다")
+                .isEqualTo(1);
     }
 
     @Test
-    @DisplayName("🔴 그래서 N+1 이 「1번씩 여러 가지」로 보일 수 있다 — 반복이 안 세인다")
+    @DisplayName("✅ 그래서 N+1 의 반복이 «제대로» 세인다")
     void 반복이_안_세인다() {
         List<Long> 아이디 = orderRepository.findAll().stream().map(Order::getId).toList();
 
@@ -139,8 +145,9 @@ class SqlShapeFoldingTest {
         System.out.println("  🔴 오라클이 보는 「가장 많이 반복된 모양」: " + 가장많이반복된것 + "번");
 
         assertThat(가장많이반복된것)
-                .as("🔴 5번 돈 것이 이보다 적게 보이면, 문턱을 넘지 못해 N+1 을 «놓친다»")
-                .isLessThan(5);
+                .as("🔴 2026-09-16 «이전»에는 여기가 1 이었다 — 5번 돈 것이 1번으로 보여서 "
+                        + "문턱(2)을 못 넘고 N+1 을 통째로 놓쳤다. 이제 «실제로 돈 횟수»가 보인다")
+                .isEqualTo(5);
     }
 
     @Test

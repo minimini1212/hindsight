@@ -106,7 +106,8 @@ class RecordingCodecTest {
         @DisplayName("아는 것보다 높은 판은 대충 읽지 않고 멈춘다")
         void refusesNewerSchema() {
             String json = codec.toJson(Recordings.full())
-                    .replaceFirst("\"schemaVersion\" : 1", "\"schemaVersion\" : 99");
+                    .replaceFirst("\"schemaVersion\" : " + Recording.CURRENT_SCHEMA_VERSION,
+                            "\"schemaVersion\" : 99");
 
             assertThatThrownBy(() -> codec.fromJson(json))
                     .isInstanceOf(RecordingCodec.UnreadableRecordingException.class)

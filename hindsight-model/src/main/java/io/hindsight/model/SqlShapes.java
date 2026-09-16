@@ -52,10 +52,43 @@ public final class SqlShapes {
         }
         return sql
                 .replaceAll("'[^']*'", "?")      // 문자열 값
-                .replaceAll("\\b\\d+\\b", "?")   // 숫자 값
-                .replaceAll("\\s+", " ")
+                .replaceAll(PAT_NUM, "?")        // 숫자 값
+                .replaceAll(PAT_IN, "in (?)")    // 🔴 IN 절: 인자 «개수»를 접는다
+                .replaceAll(PAT_WS, " ")
                 .trim();
     }
+
+    /** 숫자 값. */
+    private static final String PAT_NUM = "\\b\\d+\\b";
+
+    /**
+     * 🔴 <b>{\\code in (?,?,?)} 를 {\\code in (?)} 로 접는다.</b>
+     *
+     * <h2>왜 — 재서 알았다 (2026-09-16, 실험 ⑰)</h2>
+     * 하이버네이트는 {\\code IN} 의 인자 «개수»만큼 물음표를 붙인다. 그래서 <b>같은 코드
+     * 한 줄</b>이 {\\code in (?,?)} · {\\code in (?,?,?)} … 를 만들고, 그게 <b>서로 다른
+     * 모양</b>으로 세였다. 실제로 이렇게 나왔다.
+     *
+     * <pre>
+     *   실제로 같은 코드가 돈 횟수: 5번
+     *   🔴 오라클이 보는 「가장 많이 반복된 모양」: 1번
+     * </pre>
+     *
+     * <p>반복 문턱이 2 이므로 <b>이 모양의 N+1 은 통째로 안 잡혔다.</b>
+     *
+     * <h2>⚠️ 접으면 잃는 것</h2>
+     * 인자 2개짜리와 200개짜리가 <b>같은 모양</b>이 된다. 「몇 개였나」는 성능에서 중요한데,
+     * 그건 모양이 아니라 <b>질의문 자체</b>에 남는다({\\code events} 의 {\\code sql} 은 안 건드린다).
+     * 🔴 모양은 «세는 데» 쓰고, 읽는 것은 원문이다.
+     *
+     * <h2>🔴 그래서 판 번호가 올라갔다 (1 → 2)</h2>
+     * {\\code Summary.SqlShape.sqlHash} 는 <b>파일에 저장되는 값</b>이다. 규칙이 바뀌면
+     * 1판 파일에 적힌 해시를 <b>지금 코드는 절대 만들어 내지 못한다</b> —
+     * 그걸 안 드러내면 「모름」이 「없음」이 된다.
+     */
+    private static final String PAT_IN = "(?i)\\bin\\s*\\(\\s*\\?\\s*(?:,\\s*\\?\\s*)*\\)";
+
+    private static final String PAT_WS = "\\s+";
 
     /**
      * 모양에 붙이는 지문. 같은 모양이면 같은 값이 나온다.
