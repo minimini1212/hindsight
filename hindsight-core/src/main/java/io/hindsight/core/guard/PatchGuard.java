@@ -59,6 +59,37 @@ public final class PatchGuard {
         this(기본_허용);
     }
 
+    /**
+     * 🔴 <b>설정에서 화이트리스트를 읽는다. 금지 목록은 «설정으로 못 넓힌다».</b>
+     *
+     * <p>{@code HINDSIGHT_PATCH_ALLOWED_PATHS} 는 쉼표로 나눈 접두어 목록이다.
+     * 없으면 {@link #기본_허용}.
+     *
+     * <p>⚠️ 넓히는 것은 언제나 위험을 «늘리는» 쪽이다. 그래서 설정으로 바꿀 수 있는 것은
+     * <b>허용 목록뿐</b>이고, {@code src/test/} · {@code .git/} · {@code recordings/} 같은
+     * 금지 목록은 <b>코드에 박혀 있다</b> — 설정 한 줄로 채점기를 고칠 수 있게 되면
+     * 그 순간 채점이 아니게 된다.
+     *
+     * @param env 이름 → 값. 없으면 {@code null}
+     */
+    public static PatchGuard from(java.util.function.Function<String, String> env) {
+        String 값 = env.apply("HINDSIGHT_PATCH_ALLOWED_PATHS");
+        if (값 == null || 값.isBlank()) {
+            return new PatchGuard();
+        }
+        List<String> 허용 = java.util.Arrays.stream(값.split(","))
+                .map(String::trim)
+                .filter(x -> !x.isEmpty())
+                .toList();
+        if (허용.isEmpty()) {
+            // 🔴 「비어 있다」를 「전부 허용」으로 읽지 않는다. 그 반대가 안전한 쪽이다.
+            throw new IllegalArgumentException(
+                    "HINDSIGHT_PATCH_ALLOWED_PATHS 가 비어 있다. "
+                            + "비워 두려면 아예 «설정하지 않는다» — 그러면 기본값을 쓴다");
+        }
+        return new PatchGuard(허용);
+    }
+
     public PatchGuard(List<String> 허용) {
         this.허용 = List.copyOf(허용);
     }

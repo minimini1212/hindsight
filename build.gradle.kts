@@ -349,3 +349,76 @@ tasks.register("checkLauncherScripts") {
 }
 
 tasks.named("check") { dependsOn("checkLauncherScripts") }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 .env.example 의 이름과 «코드가 실제로 읽는» 이름이 어긋나지 않게 한다
+//
+// 2026-09-16 에 넷이 어긋나 있었다. 가장 나쁜 것은 HINDSIGHT_RECORDINGS_DIR 이었다 —
+// .env.example 에 그렇게 적혀 있는데 코드는 HINDSIGHT_STORE_DIR 을 읽는다.
+// 🔴 사용자가 시키는 대로 채워도 «아무 일도 안 일어난다». 그리고 아무 오류도 안 난다.
+//
+// ⚠️ 이건 「문서가 낡았다」보다 나쁘다. 문서가 낡으면 읽다가 이상함을 느끼는데,
+//    이름이 어긋나면 «맞게 한 것처럼 보이면서» 조용히 무시된다.
+//
+// 🔴 아직 코드가 «안 읽는» 이름은 아래에 적는다. 적는다는 것은 「알고 두는 것」이라는 뜻이고,
+//    빈 목록이 목표다 — 이름이 오래 남아 있으면 그건 미완성이라는 신호다.
+// ────────────────────────────────────────────────────────────────────────────
+val 아직_안_읽는_설정 = setOf(
+    // 저장소 총량이 넘칠 때 오래된 기록을 지우는 코드가 아직 없다
+    "HINDSIGHT_STORE_MAX_BYTES",
+)
+
+tasks.register("checkEnvNames") {
+    group = "verification"
+    description = ".env.example 의 이름과 코드가 읽는 이름이 같은지 본다"
+
+    val envFile = file(".env.example")
+    val sources = files(
+        "hindsight-core/src/main/java",
+        "hindsight-recorder-simple/src/main/java",
+        "hindsight-model/src/main/java",
+    )
+    inputs.file(envFile)
+    inputs.files(sources)
+
+    doLast {
+        val 이름모양 = Regex("\\b(?:HINDSIGHT|LLM|GITHUB)_[A-Z0-9_]+\\b")
+        val 줄모양 = Regex("^([A-Z0-9_]+)=")
+
+        val 예시에_있는 = envFile.readLines()
+            .mapNotNull { 줄모양.find(it.trim())?.groupValues?.get(1) }
+            .toSet()
+
+        // 🔴 주석을 걷어내고 «코드»에서만 찾는다. 주석에 적힌 이름을 세면, 설명을 적었다는
+        //    이유로 검사에 걸리고 — 그러면 다음 사람은 설명을 지운다.
+        //    (checkPackageDirection 과 같은 이유, 같은 방법이다)
+        val 코드가_읽는 = mutableSetOf<String>()
+        sources.asFileTree.matching { include("**/*.java") }.forEach { f ->
+            이름모양.findAll(주석을_걷어낸다(f.readText())).forEach { 코드가_읽는 += it.value }
+        }
+
+        val 어긴것 = mutableListOf<String>()
+        (코드가_읽는 - 예시에_있는).sorted().forEach { 이름 ->
+            어긴것 += "  $이름  →  코드는 읽는데 .env.example 에 «없다». 쓰는 사람이 이 값을 모른다"
+        }
+        (예시에_있는 - 코드가_읽는 - 아직_안_읽는_설정).sorted().forEach { 이름 ->
+            어긴것 += "  $이름  →  .env.example 에 있는데 코드가 «안 읽는다». 채워도 조용히 무시된다"
+        }
+
+        if (어긴것.isNotEmpty()) {
+            throw GradleException(
+                """
+                |설정 이름이 어긋난다 (${어긴것.size}곳):
+                |
+                |${어긴것.joinToString("\n")}
+                |
+                |🔴 이름이 어긋나면 «맞게 한 것처럼 보이면서» 조용히 무시된다.
+                |   아직 안 만든 것이라면 루트 build.gradle.kts 의 「아직_안_읽는_설정」에
+                |   이름을 적는다 — «알고 두는 것»과 «빠뜨린 것»은 다른 사실이다.
+                """.trimMargin()
+            )
+        }
+    }
+}
+
+tasks.named("check") { dependsOn("checkEnvNames") }
